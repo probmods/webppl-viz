@@ -1,15 +1,17 @@
-Some visualization functions for webppl:
+**Work in progress**
 
-* `vizPrint` takes an ERP and makes a sort of reasonable set of plots.
+Some visualization functions for WebPPL running in the browser.
 
-To compile `webppl.min.js` to include these functions:
+Right now, only defines `viz.print`, which takes an ERP and makes a sort of reasonable set of plots.
+
+Compiling:
 
 ```sh
-cd webppl
-# need to make sure webppl-viz package is reachable from webppl
-browserify -t [./src/bundle.js --require webppl-viz] -g brfs src/browser.js > compiled/webppl.js
-# to be safe, might want to specify -b ascii_only=true,beautify=false
-uglifyjs compiled/webppl.js > compiled/webppl.min.js
+make demo/webppl-viz.js
 ```
 
-See [index.html](http://web.stanford.edu/~erindb/webppl-viz/) for examples.
+Watchified compiling (incrementally rebuilds after source files have updated):
+
+```sh
+make watch
+```
