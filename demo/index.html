@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+  <script src="webppl.js"></script>
+  <script src="editor.js"></script>
+  <script src="webppl-viz.js"></script>
+  <script src="jquery.js"></script>
+  <!-- <link rel="stylesheet" href="viz.css"> -->
+  <link rel='stylesheet' type='text/css' href='codemirror-5.8.0.css'>
+  <link rel="stylesheet" href="editor.css">
+
+  <style>
+        pre {
+         border: 1px solid black;
+         border-radius: 2px;
+         margin: 0;
+         padding: 4px;
+     }
+
+   body {
+       width: 50%;
+       min-width: 600px;
+       margin: 0 auto;
+   }
+
+
+  </style>
+</head>
+
+<body>
+
+<h1>Examples</h1>
+
+<pre><code>var continuous_erp_3d = ParticleFilter(function() {
+  return {
+    X: gaussian(0,1),
+    Y: gaussian(0,1),
+    Z: gaussian(0,1)
+  }
+}, 1000);
+viz.print(continuous_erp_3d);
+</code></pre>
+
+<pre><code>var discrete_erp_3d = Enumerate(function() {
+  return {
+    who: categorical([1, 1, 1, 1, 1, 1], ["Plum", "Peacock", "White", "Scarlet", "Mustard", "Green"]),
+    where: categorical([1, 3, 5, 2, 4], ["candlestick", "knife", "revolver", "rope", "poison"]),
+    with_what: categorical([1, 1, 1, 1, 1], ["dining", "kitchen", "hall", "conservatory", "library"])
+  }
+});
+viz.print(discrete_erp_3d);
+</code></pre>
+
+<pre><code>var discrete_erp_2d = Enumerate(function() {
+  return {
+    fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"]),
+    boolean: flip(0.7)
+  }
+});
+viz.print(discrete_erp_2d);
+</code></pre>
+
+<pre><code>var continuous_erp_2d = ParticleFilter(function() {
+  return {
+    X: gaussian(0, 1),
+    Y: gaussian(0, 1)
+  }
+}, 1000);
+viz.print(continuous_erp_2d);
+</code></pre>
+
+<pre><code>var continuous_erp = ParticleFilter(function() { return gaussian(0, 1); }, 1000);
+viz.print(continuous_erp);
+</code></pre>
+
+<pre><code>var discrete_erp = Enumerate(function() { return flip(0.9) ? "apple" : "orange"; });
+viz.print(discrete_erp);
+</code></pre>
+
+</body>
+<script>
+var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
+preEls.map(function(el) { wpCodeEditor(el, {language: 'webppl'}); });
+</script>
+
+</html>
