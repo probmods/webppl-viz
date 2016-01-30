@@ -1,10 +1,19 @@
 'use strict';
 
+/*
 
+  relies on vega-lite library
+
+  */
+
+var _ = require('underscore');
 var d3 = require('d3');
 var insertCss = require('insert-css');
 var fs = require('fs');
 var $ = require('jquery');
+
+var vl = require('vega-lite');
+var vg = require('vega');
 
 function isErpWithSupport(x) {
   // TODO: take from dippl
@@ -21,9 +30,12 @@ var wait = function(ms,f) {
 
 var numPlots = 0;
 
+var cssFileContents = fs.readFileSync(__dirname + '/../demo/viz.css', 'utf8');
+
 function print(x) {
+  // TODO: remove this once i switch print() to vega
   if (!cssInjected) {
-    insertCss(fs.readFileSync(__dirname + '/../demo/viz.css'))
+    insertCss(cssFileContents)
     cssInjected = true;
   }
 
@@ -541,6 +553,152 @@ function plotMarginals(labels, counts, resultDivSelector) {
   }
 }
 
+var svgTemplate = _.template(
+  '<?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg class="marks" width="<%- width %>" height="<%- height %>" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><style type="text/css">' + cssFileContents +'</style></defs>');
+
+function parseVl(vlSpec) {
+  var vgSpec = vl.compile(vlSpec).spec;
+
+  var resultContainer = makeResultContainer();
+  var tempDiv = document.createElement('div');
+
+  vg.parse.spec(vgSpec,
+                function(error, chart) {
+                  // // directly inject svg (resulting image is not downloadable)
+                  // chart({el:resultContainer,renderer: 'svg'}).update();
+
+                  // render to a tempDiv, then get the text of the svg and inject it into an <img>
+                  // element using a data uri (resulting image is downloadable)
+                  chart({el:tempDiv,renderer: 'svg'}).update();
+                  var svg = $(tempDiv).find("svg")[0];
+                  var svgText = svg.innerHTML;
+                  // when tempDiv, using jQuery to get width and height doesn't work
+                  var svgHeader = svgTemplate({width: svg.width.baseVal.value,//$(svg).width(),
+                                               height: svg.height.baseVal.value // $(svg).height()
+                                              })
+
+                  $(resultContainer)
+                    .empty()
+                    .append($("<img>")
+                            .addClass("graphic")
+                            .attr({src: 'data:image/svg+xml;utf8,' +
+                                   svgHeader +
+                                   svgText + '</svg>'
+                                  }));
+                });
+}
+
+
+// TODO: maybe a better function signature is
+// bar([{<key1>: ..., <key2>: ...])
+// and we map key1 to x, key2 to y
+//.. i wish javascript had types and multiple dispatch
+var bar = function(xs,ys, opts) {
+  opts = _.defaults(opts || {},
+                    {xLabel: 'x',
+                     yLabel: 'y'});
+
+  var data = _.zip(xs,ys).map(function(pair) {
+    return {x: pair[0], y: pair[1]}
+  })
+
+  var vlSpec = {
+    "data": {"values": data},
+    "mark": "bar",
+    encoding: {
+      x: {"type": "nominal", "field": "x", axis: {title: opts.xLabel}},
+      y: {"type": "quantitative", "field": "y", axis: {title: opts.yLabel}}
+    }
+  };
+
+  parseVl(vlSpec);
+}
+
+var hist = function(samples) {
+  var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+  var labels = _(frequencyDict).keys();
+  var counts = _(frequencyDict).values();
+  bar(labels, counts, {xLabel: 'Value', yLabel: 'Frequency'})
+};
+
+// TODO: rename to scatter after porting erin's vizPrint code to vega
+var _scatter = function(xs, ys, opts) {
+  opts = _.defaults(opts || {},
+                    {xLabel: 'x',
+                     yLabel: 'y'});
+
+  var data = _.zip(xs,ys).map(function(pair) {
+    return {x: pair[0], y: pair[1]}
+  })
+
+  var vlSpec = {
+    "data": {"values": data},
+    "mark": "point",
+    "encoding": {
+      "x": {"field": "x","type": "quantitative", axis: {title: opts.xLabel}},
+      "y": {"field": "y","type": "quantitative", axis: {title: opts.yLabel}}
+    }
+  }
+
+  parseVl(vlSpec);
+}
+
+var kde = function(samps, kernel) {
+  if (kernel === undefined || typeof kernel !== 'function') {
+    kernel = function(u) {
+      return Math.abs(u) <= 1 ? .75 * (1 - u * u) : 0;
+    };
+  }
+
+  // get optimal bandwidth
+  // HT http://en.wikipedia.org/wiki/Kernel_density_estimation#Practical_estimation_of_the_bandwidth
+  var n = samps.length;
+  var mean = samps.reduce(function(x,y) { return x + y })/n;
+
+  var s = Math.sqrt(samps.reduce(function(acc, x) {
+    return acc + Math.pow(x - mean, 2)
+  }) / (n-1));
+
+  var bandwidth = 1.06 * s * Math.pow(n, -0.2);
+
+  var min = _.min(samps);
+  var max = _.max(samps);
+
+  var numBins = (max - min) / bandwidth;
+
+  var results = [];
+
+  for (var i = 0; i <= numBins; i++) {
+    var x = min + bandwidth * i;
+    var kernelSum = 0;
+    for (var j = 0; j < samps.length; j++) {
+      kernelSum += kernel((x - samps[j]) / bandwidth);
+    }
+    results.push({item: x, density: kernelSum / (n * bandwidth)});
+  }
+  return results;
+}
+
+var density = function(samples) {
+  var densityEstimate = kde(samples);
+
+  var vlSpec = {
+    "data": {values: densityEstimate},
+    "mark": "area",
+    "encoding": {
+      "x": {"field": "item", "type": "quantitative", axis: {title: 'Value'}},
+      "y": {"field": "density","type": "quantitative", axis: {title: 'Density'}}
+    },
+    "config": {"mark": {"interpolate": "monotone"}}
+  };
+
+  parseVl(vlSpec);
+}
+
 global.viz = {
-  print: print
+  print: print,
+  bar: bar,
+  hist: hist,
+  scatter: _scatter,
+  density: density
 }

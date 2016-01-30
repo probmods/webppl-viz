@@ -2,35 +2,40 @@
 <html>
   <head>
     <meta charset="UTF-8">
-  <script src="webppl.js"></script>
-  <script src="editor.js"></script>
-  <script src="webppl-viz.js"></script>
-  <script src="jquery.js"></script>
-  <!-- <link rel="stylesheet" href="viz.css"> -->
-  <link rel='stylesheet' type='text/css' href='codemirror-5.8.0.css'>
-  <link rel="stylesheet" href="editor.css">
+    <script src="editor.js"></script>
+    <script src="webppl-viz.js"></script>
+    <script src="jquery.js"></script>
+    <link rel="stylesheet" href="viz.css">
+    <link rel="stylesheet" href="editor.css">
 
-  <style>
-        pre {
+    <style>
+     pre {
          border: 1px solid black;
          border-radius: 2px;
          margin: 0;
          padding: 4px;
      }
 
-   body {
-       width: 50%;
-       min-width: 600px;
-       margin: 0 auto;
-   }
+     body {
+         width: 50%;
+         min-width: 600px;
+         margin: 0 auto;
+     }
 
 
-  </style>
-</head>
-
+    </style>
+  </head>
 <body>
 
 <h1>Examples</h1>
+
+<pre><code>viz.bar(['a','b','c'], [1,2,3])</code></pre>
+
+<pre><code>viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))</code></pre>
+
+<pre><code>viz.scatter([1,2,3],[4,5,6])</code></pre>
+
+<pre><code>viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
 
 <pre><code>var continuous_erp_3d = ParticleFilter(function() {
   return {
@@ -83,5 +88,6 @@ viz.print(discrete_erp);
 var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
 preEls.map(function(el) { wpCodeEditor(el, {language: 'webppl'}); });
 </script>
+<script src="webppl.js" defer></script>
 
 </html>
