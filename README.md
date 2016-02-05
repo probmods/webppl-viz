@@ -2,6 +2,8 @@
 
 Some visualization functions for WebPPL running in the browser.
 
+Demo: http://web.stanford.edu/~louyang/wp-viz/index.html
+
 Usage:
 
 ```js
