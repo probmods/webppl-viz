@@ -20,6 +20,7 @@
          min-width: 600px;
          margin: 0 auto;
          font-family: Menlo;
+         font-size: 12px;
      }
 
      .col {
@@ -35,10 +36,18 @@
          font-size: 20px
      }
 
-
+     code {
+         border: 1px solid #ddd;
+         border-radius: 2px;
+         background-color: #ddd;
+         padding: 0 3px;
+     }
     </style>
   </head>
 <body>
+  <div style="width: 50%; margin: 5px">
+    note: the older version of the autoviz function (the d3 version erin wrote) is currently called <code>viz.print</code>, whereas the new version (the vega-lite version long is writing) is currently called <code>viz.vegaPrint</code>
+  </div>
 
   <div class="col" style="float: left">
     <h1>vega simple</h1>
