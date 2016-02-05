@@ -17,9 +17,22 @@
      }
 
      body {
-         width: 50%;
          min-width: 600px;
          margin: 0 auto;
+         font-family: Menlo;
+     }
+
+     .col {
+         width: 550px;
+         margin: 10px
+     }
+
+     .wpedit .CodeMirror {
+         font-size: 10px;
+     }
+
+     h1 {
+         font-size: 20px
      }
 
 
@@ -27,16 +40,26 @@
   </head>
 <body>
 
-<h1>Examples</h1>
+  <div class="col" style="float: left">
+    <h1>vega simple</h1>
+    <pre><code>viz.bar(['a','b','c'], [1,2,3])</code></pre>
+    <pre><code>viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))</code></pre>
+    <pre><code>viz.scatter([1,2,3],[4,5,6])</code></pre>
+    <pre><code>viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
+    <h1>vega automatic</h1>
+    <pre><code>var cr = MH(function() {
+  return {
+    brand: uniformDraw(['coke','pepsi']),
+    price: gaussian(0,1)
+  }
+}, 1000);
+viz.vegaPrint(cr)</code></pre>
 
-<pre><code>viz.bar(['a','b','c'], [1,2,3])</code></pre>
 
-<pre><code>viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))</code></pre>
+  </div>
 
-<pre><code>viz.scatter([1,2,3],[4,5,6])</code></pre>
-
-<pre><code>viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
-
+  <div class="col" style="float: left">
+    <h1>erin's examples</h1>
 <pre><code>var continuous_erp_3d = ParticleFilter(function() {
   return {
     X: gaussian(0,1),
@@ -82,6 +105,7 @@ viz.print(continuous_erp);
 <pre><code>var discrete_erp = Enumerate(function() { return flip(0.9) ? "apple" : "orange"; });
 viz.print(discrete_erp);
 </code></pre>
+</div>
 
 </body>
 <script>
