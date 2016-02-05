@@ -47,15 +47,14 @@
     <pre><code>viz.scatter([1,2,3],[4,5,6])</code></pre>
     <pre><code>viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
     <h1>vega automatic</h1>
-    <pre><code>var cr = MH(function() {
+    <pre><code>var model = MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi';
   return {
-    brand: uniformDraw(['coke','pepsi']),
-    price: gaussian(0,1)
+    brand: brand,
+    price: gaussian(brand == 'coke' ? 4 : 2, 1)
   }
-}, 1000);
-viz.vegaPrint(cr)</code></pre>
-
-
+}, 2000);
+viz.vegaPrint(model)</code></pre>
   </div>
 
   <div class="col" style="float: left">

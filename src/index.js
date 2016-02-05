@@ -102,6 +102,114 @@ function print(x) {
   }
 }
 
+var kindPrinter = {};
+
+kindPrinter.cr = function(types, support, scores) {
+  var typesExpanded = _.map(types, function(v,k) {
+    return {name: k,
+            type: v}
+  })
+
+  var cDimNames = _(typesExpanded).chain().where({type: 'categorical'}).pluck('name').value();
+  var rDimNames = _(typesExpanded).chain().where({type: 'real'}).pluck('name').value();
+
+  var cDimName = cDimNames[0];
+  var rDimName = rDimNames[0]
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var dataGroupedByC = _.groupBy(data, function(obs) { return obs[cDimName] });
+
+  // for each group, get the density estimate and weight each bin within that estimate
+  // by the total group probability
+  var densityEstimates = _.mapObject(dataGroupedByC,
+                                     function(states, k) {
+
+                                       var groupWeight = util.sum(_.pluck(states,'prob'));
+
+                                       var rValues = _.pluck(states, rDimName);
+                                       var estimates = kde(rValues);
+                                       _.each(estimates, function(est) { est.density *= groupWeight });
+                                       return estimates;
+                                     });
+
+  // TODO: do this cleaner and without mutation
+  var densityEstimatesTidied = _.chain(densityEstimates)
+      .pairs()
+      .map(function(x) {
+        var cValue = x[0];
+        var densityBins = x[1];
+        densityBins.forEach(function(bin) { bin[cDimName] = cValue });
+        return densityBins })
+      .flatten(1)
+      .value();
+
+  var vlSpec = {
+    "data": {"values": densityEstimatesTidied},
+    "mark": "line",
+    encoding: {
+      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}},
+      y: {"type": "quantitative", "field": "density"},
+      color: {"type": "nominal", "field": cDimName, axis: {title: cDimName}}
+    }
+  };
+
+  parseVl(vlSpec);
+
+}
+
+var vegaPrint = function(obj) {
+  var getColumnType = function(columnValues) {
+    // for now, support real, integer, and categorical
+    // some questions:
+    // - can we support list of reals a la dirichlet?
+    // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
+    if (_.every(columnValues, _.isNumber)) {
+      return _.every(columnValues, Number.isInteger) ? 'categorical' : 'real'
+    } else {
+      return 'categorical'
+    }
+  };
+
+  var getColumnTypes = function(df) {
+    var columnNames = _.keys(df[0]);
+    return _.object(
+      columnNames,
+      _.map(columnNames,
+            function(name) {
+              var columnValues = _.pluck(df, name);
+              return getColumnType(columnValues)
+            })
+    )
+  };
+
+  if (isErpWithSupport(obj)) {
+    var support = obj.support();
+    var scores = _.map(support,
+                       function(state){return obj.score(null, state);});
+
+    var columnTypesDict = getColumnTypes(support);
+
+    // the *kind* of a dataframe is the set of its
+    // column types,
+    // e.g., the type of [{a: 2.5, b: 'foo'}, {a: 3.1, b: 'bar'}]
+    // is cr
+    var dfKind = _.values(columnTypesDict)
+        .map(function(str) { return str.substring(0,1) })
+        .sort()
+        .join('');
+
+    if (_.has(kindPrinter, dfKind)) {
+      kindPrinter[dfKind](columnTypesDict, support, scores);
+    } else {
+      throw new Error('viz.print() doesn\'t know how to render this object');
+    }
+
+  }
+}
+
 
 // overall chart properties, for fitting plot within container
 var margin = {top: 20, right: 30, bottom: 30, left: 50};
@@ -643,6 +751,9 @@ var _scatter = function(xs, ys, opts) {
   parseVl(vlSpec);
 }
 
+// input: a list of samples and, optionally, a kernel function
+// output: a list of estimated densities (range is min to max and number
+// of bins is (max-min) / (1.06 * s * n^(-.02))
 var kde = function(samps, kernel) {
   if (kernel === undefined || typeof kernel !== 'function') {
     kernel = function(u) {
@@ -697,6 +808,7 @@ var density = function(samples) {
 
 global.viz = {
   print: print,
+  vegaPrint: vegaPrint,
   bar: bar,
   hist: hist,
   scatter: _scatter,
