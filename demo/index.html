@@ -86,7 +86,7 @@ viz.print(discrete_erp);
 </body>
 <script>
 var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
-preEls.map(function(el) { wpCodeEditor(el, {language: 'webppl'}); });
+preEls.map(function(el) { wpEditor.setup(el, {language: 'webppl'}); });
 </script>
 <script src="webppl.js" defer></script>
 
