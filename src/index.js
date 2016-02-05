@@ -40,7 +40,7 @@ function print(x) {
   }
 
   // name the plots to keep compatibility with the rest of erin's code
-  var _resultDiv = makeResultContainer();
+  var _resultDiv = wpEditor.makeResultContainer();
   var resultDiv = $(_resultDiv);
   var resultDivId = "_v" + numPlots;
   resultDiv.attr("id", resultDivId);
@@ -559,7 +559,7 @@ var svgTemplate = _.template(
 function parseVl(vlSpec) {
   var vgSpec = vl.compile(vlSpec).spec;
 
-  var resultContainer = makeResultContainer();
+  var resultContainer = wpEditor.makeResultContainer();
   var tempDiv = document.createElement('div');
 
   vg.parse.spec(vgSpec,
