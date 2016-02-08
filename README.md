@@ -1,6 +1,6 @@
 **Note: work in progress**
 
-Some visualization functions for WebPPL running in the browser.
+Some in-browser visualization functions for WebPPL (requires version 0.6.1 or higher and webppl-editor)
 
 Demo: http://web.stanford.edu/~louyang/wp-viz/index.html
 
