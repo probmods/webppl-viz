@@ -104,6 +104,28 @@ function print(x) {
 
 var kindPrinter = {};
 
+kindPrinter.rr = function(types, support, scores) {
+  var fieldNames = _.keys(support[0]);
+  var field1Name = fieldNames[0];
+  var field2Name = fieldNames[1];
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var vlSpec = {
+    data: {values: data},
+    mark: "point",
+    encoding: {
+      x: {field: field1Name, type: "quantitative"},
+      y: {field: field2Name, type: "quantitative"},
+      size: {field: 'prob', type: 'quantitative'}
+    }
+  }
+
+  parseVl(vlSpec);
+}
+
 kindPrinter.cr = function(types, support, scores) {
   var typesExpanded = _.map(types, function(v,k) {
     return {name: k,

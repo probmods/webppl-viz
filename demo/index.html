@@ -50,6 +50,16 @@
   </div>
 
   <div class="col" style="float: left">
+    <h1>misc</h1>
+
+    <pre><code>viz.print(Enumerate(function(){
+  return {
+    "a": flip(.9) ? 0 : 1,
+    "b": flip(.9) ? 0 : 1,
+    "c": flip(.99) ? 0 : 1
+  }
+}))</code></pre>
+
     <h1>vega simple</h1>
     <pre><code>viz.bar(['a','b','c'], [1,2,3])</code></pre>
     <pre><code>viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))</code></pre>
@@ -64,6 +74,17 @@
   }
 }, 2000);
 viz.vegaPrint(model)</code></pre>
+
+    <pre><code>var model = function() {
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+
+  factor(Math.log(Math.abs(x-y)))
+  return {x: x, y: y};
+}
+
+viz.vegaPrint(MH(model, 5000))</code></pre>
+
   </div>
 
   <div class="col" style="float: left">
