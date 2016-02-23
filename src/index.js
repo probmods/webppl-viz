@@ -695,6 +695,8 @@ function parseVl(vlSpec) {
   var resultContainer = wpEditor.makeResultContainer();
   var tempDiv = document.createElement('div');
 
+  $(resultContainer).text('rendering...')
+
   vg.parse.spec(vgSpec,
                 function(error, chart) {
                   // // directly inject svg (resulting image is not downloadable)
