@@ -119,7 +119,10 @@ kindPrinter.rr = function(types, support, scores) {
     encoding: {
       x: {field: field1Name, type: "quantitative"},
       y: {field: field2Name, type: "quantitative"},
-      size: {field: 'prob', type: 'quantitative'}
+      size: {field: 'prob', type: 'quantitative'},
+      color: {field: 'prob', type: 'quantitative'}
+      // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
+      // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
     }
   }
 
