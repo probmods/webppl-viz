@@ -104,6 +104,43 @@ function print(x) {
 
 var kindPrinter = {};
 
+kindPrinter.c = function(types, support, scores) {
+  var fieldNames = _.keys(support[0]);
+  var fieldName = fieldNames[0];
+
+  var values = _.pluck(support, fieldName);
+  var probs = scores.map(function(score) { return Math.exp(score) });
+
+  bar(values, probs, {xLabel: fieldName, yLabel: 'frequency'})
+}
+
+// TODO: visualizing [{x: foo}, {x: bar}, {x: baz}]
+// should be the same as visualizing [foo, bar, baz]
+kindPrinter.r = function(types, support, scores) {
+  var fieldNames = _.keys(support[0]);
+  var fieldName = fieldNames[0];
+
+  var values = _.pluck(support, fieldName);
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var densityEstimates = kde(values);
+
+  var vlSpec = {
+    "data": {"values": densityEstimates},
+    "mark": "line",
+    encoding: {
+      x: {"type": "quantitative", "field": "item", axis: {title: fieldName}},
+      y: {"type": "quantitative", "field": "density"}
+    }
+  };
+
+  parseVl(vlSpec);
+
+}
+
 kindPrinter.rr = function(types, support, scores) {
   var fieldNames = _.keys(support[0]);
   var field1Name = fieldNames[0];
