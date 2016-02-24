@@ -770,7 +770,8 @@ var bar = function(xs,ys, opts) {
     encoding: {
       x: {"type": "nominal", "field": "x", axis: {title: opts.xLabel}},
       y: {"type": "quantitative", "field": "y", axis: {title: opts.yLabel}}
-    }
+    },
+    config: {numberFormat: "f"}
   };
 
   parseVl(vlSpec);
