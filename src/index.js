@@ -185,6 +185,33 @@ kindPrinter.cr = function(types, support, scores) {
 
 }
 
+kindPrinter.cc = function(types, support, scores) {
+  var fieldNames = _.keys(support[0]);
+  var field1Name = fieldNames[0];
+  var field2Name = fieldNames[1];
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var vlSpec = {
+    data: {values: data},
+    mark: "text",
+    encoding: {
+      row: {field: field1Name, type: 'nominal'},
+      column: {field: field2Name, type: 'nominal'},
+      color: {field: 'prob', type: 'quantitative'},
+      text: {field: 'prob', type: 'quantitative'}
+      // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
+      // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
+    },
+    // TODO: tweak number formatting so it doesn't show too many significant digits
+    config: {mark: {applyColorToBackground: true}, numberFormat: "f"}
+  }
+
+  parseVl(vlSpec);
+}
+
 var vegaPrint = function(obj) {
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
