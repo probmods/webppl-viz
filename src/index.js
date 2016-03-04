@@ -239,7 +239,8 @@ kindPrinter.rr = function(types, support, scores) {
       x: {field: field1Name, type: "quantitative"},
       y: {field: field2Name, type: "quantitative"},
       size: {field: 'prob', type: 'quantitative'},
-      color: {field: 'prob', type: 'quantitative'}
+      color: {field: 'prob', type: 'quantitative'},
+      order: {"field": 'prob', "type": "quantitative", "sort": "ascending"}
       // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
       // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
     },
@@ -309,7 +310,8 @@ kindPrinter.crr = function(types, support, scores) {
       x: {field: rDimNames[0], type: "quantitative"},
       y: {field: rDimNames[1], type: "quantitative"},
       size: {field: 'prob', type: 'quantitative'},
-      color: {field: 'prob', type: 'quantitative'}
+      color: {field: 'prob', type: 'quantitative'},
+      order: {'field': 'prob', 'type': 'quantitative', 'sort': 'ascending'}
       // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
       // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
     },
