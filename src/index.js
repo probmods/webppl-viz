@@ -160,7 +160,8 @@ kindPrinter.rr = function(types, support, scores) {
       color: {field: 'prob', type: 'quantitative'}
       // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
       // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
-    }
+    },
+    config: {numberFormat: ".1e"}
   }
 
   parseVl(vlSpec);
@@ -243,7 +244,7 @@ kindPrinter.cc = function(types, support, scores) {
       // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
     },
     // TODO: tweak number formatting so it doesn't show too many significant digits
-    config: {mark: {applyColorToBackground: true}, numberFormat: "f"}
+    config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
   }
 
   parseVl(vlSpec);
