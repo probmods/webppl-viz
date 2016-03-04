@@ -50,21 +50,14 @@
   </div>
 
   <div class="col" style="float: left">
-    <h1>misc</h1>
-
-    <pre><code>viz.print(Enumerate(function(){return {
-"a": flip(.9) ? 0 : 1,
-"b": flip(.9) ? 0 : 1,
-"c": flip(.99) ? 0 : 1}}))</code></pre>
-
-    <h1>vega simple</h1>
+    <h1>new (vega)</h1>
+    primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
 viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))
 viz.scatter([1,2,3],[4,5,6])
 viz.line([1,3,2],[4,5,6])
 viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
 
-    <h1>vega automatic</h1>
     c:
     <pre><code>viz.vegaPrint(ParticleFilter(function() {
   return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}
@@ -128,7 +121,13 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
   </div>
 
   <div class="col" style="float: left">
-    <h1>erin's examples</h1>
+    <h1>old (d3)</h1>
+    problematic:
+    <pre><code>viz.print(Enumerate(function(){return {
+"a": flip(.9) ? 0 : 1,
+"b": flip(.9) ? 0 : 1,
+"c": flip(.99) ? 0 : 1}}))</code></pre>
+
 <pre><code>var continuous_erp_3d = ParticleFilter(function() {
   return {
     X: gaussian(0,1),
