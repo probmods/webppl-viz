@@ -80,16 +80,7 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
   return {
     fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"]),
     boolean: flip(0.7)
-  }
-}))</code></pre>
-
-    rr:
-    <pre><code>viz.vegaPrint(MH(function() {
-  var x = uniform(0,1);
-  var y = uniform(0,1);
-  factor(Math.log(Math.abs(x-y)))
-  return {x: x, y: y};
-},5000))</code></pre>
+  }}))</code></pre>
 
     cr:
     <pre><code>viz.vegaPrint(MH(function() {
@@ -99,6 +90,40 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
     price: gaussian(brand == 'coke' ? 4 : 2, 1)
   }
 }, 2000));</code></pre>
+
+    rr:
+    <pre><code>viz.vegaPrint(MH(function() {
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+  factor(Math.log(Math.abs(x-y)))
+  return {x: x, y: y};
+},5000))</code></pre>
+
+
+    ccc:
+    <pre><code>viz.vegaPrint(Enumerate(function() {
+  return {
+    who: categorical([1, 1, 1, 1, 1, 1], ["Plum", "Peacock", "White", "Scarlet", "Mustard", "Green"]),
+    where: categorical([1, 3, 5, 2, 4], ["candlestick", "knife", "revolver", "rope", "poison"]),
+    with_what: categorical([1, 1, 1, 1, 1], ["dining", "kitchen", "hall", "conservatory", "library"])
+  }
+}))</code></pre>
+
+    ccr:
+    <pre><code>todo</code></pre>
+
+    crr:
+    <pre><code>viz.vegaPrint(MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi'
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+  factor(Math.log(Math.abs(x-y)))
+  return {brand: brand, x: x, y: y};
+},5000))</code></pre>
+
+    rrr:
+    <pre><code>todo</code></pre>
+
 
   </div>
 

@@ -141,7 +141,7 @@ kindPrinter.r = function(types, support, scores) {
 
 }
 
-kindPrinter.rr = function(types, support, scores) {
+kindPrinter.cc = function(types, support, scores) {
   var fieldNames = _.keys(support[0]);
   var field1Name = fieldNames[0];
   var field2Name = fieldNames[1];
@@ -152,16 +152,16 @@ kindPrinter.rr = function(types, support, scores) {
 
   var vlSpec = {
     data: {values: data},
-    mark: "point",
+    mark: "text",
     encoding: {
-      x: {field: field1Name, type: "quantitative"},
-      y: {field: field2Name, type: "quantitative"},
-      size: {field: 'prob', type: 'quantitative'},
-      color: {field: 'prob', type: 'quantitative'}
+      row: {field: field1Name, type: 'nominal'},
+      column: {field: field2Name, type: 'nominal'},
+      color: {field: 'prob', type: 'quantitative'},
+      text: {field: 'prob', type: 'quantitative'}
       // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
       // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
     },
-    config: {numberFormat: ".1e"}
+    config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
   }
 
   parseVl(vlSpec);
@@ -223,7 +223,7 @@ kindPrinter.cr = function(types, support, scores) {
 
 }
 
-kindPrinter.cc = function(types, support, scores) {
+kindPrinter.rr = function(types, support, scores) {
   var fieldNames = _.keys(support[0]);
   var field1Name = fieldNames[0];
   var field2Name = fieldNames[1];
@@ -234,17 +234,86 @@ kindPrinter.cc = function(types, support, scores) {
 
   var vlSpec = {
     data: {values: data},
-    mark: "text",
+    mark: "point",
     encoding: {
-      row: {field: field1Name, type: 'nominal'},
-      column: {field: field2Name, type: 'nominal'},
-      color: {field: 'prob', type: 'quantitative'},
-      text: {field: 'prob', type: 'quantitative'}
+      x: {field: field1Name, type: "quantitative"},
+      y: {field: field2Name, type: "quantitative"},
+      size: {field: 'prob', type: 'quantitative'},
+      color: {field: 'prob', type: 'quantitative'}
       // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
       // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
     },
-    // TODO: tweak number formatting so it doesn't show too many significant digits
-    config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
+    config: {numberFormat: ".1e"}
+  }
+
+  parseVl(vlSpec);
+}
+
+
+// TODO: find the field with the smallest number of values and use that for rows
+// TODO: rewrite once vega-lite can support small multiples of heatmaps (https://github.com/vega/vega-lite/issues/699)
+kindPrinter.ccc = function(types, support, scores) {
+  var fieldNames = _.keys(support[0]);
+  var field1Name = fieldNames[0];
+  var field2Name = fieldNames[1];
+  var field3Name = fieldNames[2];
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var bucketedData = _.groupBy(data, field3Name);
+
+  _.each(bucketedData,
+         function(d,field3Value) {
+           // TODO: make this less hacky
+           global.print({},function() {},'',field3Name + ' = ' + field3Value);
+           var vlSpec = {
+             data: {values: d},
+             mark: "text",
+             encoding: {
+               row: {field: field1Name, type: 'nominal'},
+               column: {field: field2Name, type: 'nominal'},
+               color: {field: 'prob', type: 'quantitative'},
+               text: {field: 'prob', type: 'quantitative'}
+               // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
+               // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
+             },
+             config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
+           }
+
+           parseVl(vlSpec);
+         });
+
+  // todo
+}
+
+kindPrinter.crr = function(types, support, scores) {
+  var typesExpanded = _.map(types, function(v,k) {
+    return {name: k,
+            type: v}
+  })
+
+  var cDimNames = _(typesExpanded).chain().where({type: 'categorical'}).pluck('name').value();
+  var rDimNames = _(typesExpanded).chain().where({type: 'real'}).pluck('name').value();
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var vlSpec = {
+    data: {values: data},
+    mark: "point",
+    encoding: {
+      column: {field: cDimNames[0], type: "nominal"},
+      x: {field: rDimNames[0], type: "quantitative"},
+      y: {field: rDimNames[1], type: "quantitative"},
+      size: {field: 'prob', type: 'quantitative'},
+      color: {field: 'prob', type: 'quantitative'}
+      // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
+      // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
+    },
+    config: {numberFormat: ".1e"}
   }
 
   parseVl(vlSpec);
@@ -785,6 +854,7 @@ function parseVl(vlSpec) {
                                    svgHeader +
                                    svgText + '</svg>'
                                   }));
+
                 });
 }
 
@@ -844,6 +914,7 @@ var _scatter = function(xs, ys, opts) {
   parseVl(vlSpec);
 }
 
+// TODO: density visualizations can be misleading at the bounds
 // input: a list of samples and, optionally, a kernel function
 // output: a list of estimated densities (range is min to max and number
 // of bins is (max-min) / (1.06 * s * n^(-.02))
