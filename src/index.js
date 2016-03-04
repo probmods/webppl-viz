@@ -820,9 +820,6 @@ function plotMarginals(labels, counts, resultDivSelector) {
   }
 }
 
-var svgTemplate = _.template(
-  '<?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg class="marks" width="<%- width %>" height="<%- height %>" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs><style type="text/css">' + cssFileContents +'</style></defs>');
-
 function parseVl(vlSpec) {
   var vgSpec = vl.compile(vlSpec).spec;
 
@@ -833,31 +830,10 @@ function parseVl(vlSpec) {
 
   vg.parse.spec(vgSpec,
                 function(error, chart) {
-                  // // directly inject svg (resulting image is not downloadable)
-                  // chart({el:resultContainer,renderer: 'svg'}).update();
-
-                  // render to a tempDiv, then get the text of the svg and inject it into an <img>
-                  // element using a data uri (resulting image is downloadable)
-                  chart({el:tempDiv,renderer: 'svg'}).update();
-                  var svg = $(tempDiv).find("svg")[0];
-                  var svgText = svg.innerHTML;
-                  // when tempDiv, using jQuery to get width and height doesn't work
-                  var svgHeader = svgTemplate({width: svg.width.baseVal.value,//$(svg).width(),
-                                               height: svg.height.baseVal.value // $(svg).height()
-                                              })
-
-                  $(resultContainer)
-                    .empty()
-                    .append($("<img>")
-                            .addClass("graphic")
-                            .attr({src: 'data:image/svg+xml;utf8,' +
-                                   svgHeader +
-                                   svgText + '</svg>'
-                                  }));
-
+                  $(resultContainer).empty();
+                  chart({el:resultContainer,renderer: 'svg'}).update();
                 });
 }
-
 
 // TODO: maybe a better function signature is
 // bar([{<key1>: ..., <key2>: ...])
