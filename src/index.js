@@ -1037,7 +1037,9 @@ var table = function(obj, options) {
     var support = obj.support();
     var scores = support.map(function(state) { return obj.score(null,state) });
 
-    var sortedZipped = _.sortBy(_.zip(support, scores),'1');
+    var sortedZipped = _.sortBy(_.zip(support, scores),function(z) {
+      return -z[1]
+    });
 
     var tableString = '<table><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
 
