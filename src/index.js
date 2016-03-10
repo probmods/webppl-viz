@@ -1027,6 +1027,32 @@ var line = function(xs, ys) {
   parseVl(vlSpec);
 }
 
+// visualize an erp as a table
+var table = function(obj, options) {
+  if (options === undefined)
+    options = {}
+  options = _.defaults(options, {log: false})
+
+  if (isErpWithSupport(obj)) {
+    var support = obj.support();
+    var scores = support.map(function(state) { return obj.score(null,state) });
+
+    var sortedZipped = _.sortBy(_.zip(support, scores),'1');
+
+    var tableString = '<table><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
+
+    sortedZipped.forEach(function(pair) {
+      var state = pair[0];
+      var score = pair[1];
+      tableString += "<tr><td>" + JSON.stringify(state) + "</td><td>" + (options.log ? score : Math.exp(score)) + "</td>"
+    })
+
+    var resultContainer = wpEditor.makeResultContainer();
+    resultContainer.innerHTML = tableString;
+
+  }
+}
+
 global.viz = {
   print: print,
   vegaPrint: vegaPrint,
@@ -1034,5 +1060,6 @@ global.viz = {
   hist: hist,
   scatter: _scatter,
   density: density,
-  line: line
+  line: line,
+  table: table
 }
