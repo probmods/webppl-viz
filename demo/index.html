@@ -103,7 +103,14 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
 }))</code></pre>
 
     ccr:
-    <pre><code>todo</code></pre>
+    <pre><code>viz.vegaPrint(MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi';
+  return {
+    country: uniformDraw(['usa','mexico','canada']),
+    brand: brand,
+    price: gaussian(brand == 'coke' ? 4 : 2, 1)
+  }
+}, 2000));</code></pre>
 
     crr:
     <pre><code>viz.vegaPrint(MH(function() {

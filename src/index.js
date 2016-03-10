@@ -289,6 +289,67 @@ kindPrinter.ccc = function(types, support, scores) {
   // todo
 }
 
+kindPrinter.ccr = function(types, support, scores) {
+  var typesExpanded = _.map(types, function(v,k) {
+    return {name: k,
+            type: v}
+  })
+
+  var cDimNames = _(typesExpanded).chain().where({type: 'categorical'}).pluck('name').value();
+  var rDimNames = _(typesExpanded).chain().where({type: 'real'}).pluck('name').value();
+
+  var facetDimName = cDimNames[0];
+  var cDimName = cDimNames[1];
+  var rDimName = rDimNames[0]
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var dataGroupedByC = _.groupBy(data, function(obs) { return obs[facetDimName] + "," + obs[cDimName] });
+
+  // for each group, get the density estimate and weight each bin within that estimate
+  // by the total group probability
+  var densityEstimates = _.mapObject(dataGroupedByC,
+                                     function(states, k) {
+
+                                       var groupWeight = util.sum(_.pluck(states,'prob'));
+
+                                       var rValues = _.pluck(states, rDimName);
+                                       var estimates = kde(rValues);
+                                       _.each(estimates, function(est) { est.density *= groupWeight });
+                                       return estimates;
+                                     });
+
+
+  // TODO: do this cleaner and without mutation
+  var densityEstimatesTidied = _.chain(densityEstimates)
+      .pairs()
+      .map(function(x) {
+        var keySplit = x[0].split(",");
+        var facetValue = keySplit[0];
+        var cValue = keySplit[1];
+        var densityBins = x[1];
+        densityBins.forEach(function(bin) { bin[facetDimName] = facetValue; bin[cDimName] = cValue });
+        return densityBins })
+      .flatten(1)
+      .value();
+
+  var vlSpec = {
+    "data": {"values": densityEstimatesTidied},
+    "mark": "line",
+    encoding: {
+      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}},
+      y: {"type": "quantitative", "field": "density"},
+      color: {"type": "nominal", "field": cDimName, axis: {title: cDimName}},
+      column: {type: 'nominal', field: facetDimName}
+    }
+  };
+
+  parseVl(vlSpec);
+
+}
+
 kindPrinter.crr = function(types, support, scores) {
   var typesExpanded = _.map(types, function(v,k) {
     return {name: k,
@@ -320,6 +381,8 @@ kindPrinter.crr = function(types, support, scores) {
 
   parseVl(vlSpec);
 }
+
+
 
 var vegaPrint = function(obj) {
   var getColumnType = function(columnValues) {
@@ -365,7 +428,7 @@ var vegaPrint = function(obj) {
     if (_.has(kindPrinter, dfKind)) {
       kindPrinter[dfKind](columnTypesDict, support, scores);
     } else {
-      throw new Error('viz.print() doesn\'t know how to render this object');
+      throw new Error('viz.print() doesn\'t know how to render objects of kind ' + dfKind);
     }
 
   }
