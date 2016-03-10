@@ -6,7 +6,7 @@ Dependencies:
 - webppl version 0.6.1 or higher
 - webppl-editor commit 0b6fff8 or higher
 
-Demo: http://web.stanford.edu/~louyang/wp-viz/index.html
+Demo: http://probmods.github.io/webppl-viz/
 
 Usage:
 
