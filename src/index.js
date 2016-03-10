@@ -1028,6 +1028,9 @@ var line = function(xs, ys) {
 }
 
 // visualize an erp as a table
+// TODO: if support items all have the same keys, expand them out
+// TODO, maybe one day: make this a fancy react widget with sortable columns
+// and smart hiding if there are too many rows
 var table = function(obj, options) {
   if (options === undefined)
     options = {}
