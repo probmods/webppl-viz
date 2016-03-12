@@ -23,7 +23,6 @@ var print = require('./old').print;
 var wait = function(ms,f) {
   setTimeout(f,ms);
 }
-// TODO: switch to vega completely
 
 var kindPrinter = {};
 

@@ -138,11 +138,20 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
 
   <div class="col" style="float: left">
     <h1>old (d3)</h1>
-    problematic:
+
+    problem - high probability => huge points:
     <pre><code>viz.print(Enumerate(function(){return {
 "a": flip(.9) ? 0 : 1,
 "b": flip(.9) ? 0 : 1,
 "c": flip(.99) ? 0 : 1}}))</code></pre>
+
+    problem - joint visualization can be bad (nb: problematic for new code too):
+    <pre><code>viz.print(ParticleFilter(function() {
+  return {
+    a: gaussian(0,1),
+    b: categorical([0.1,0.8,0.1],[1.1,2.1,3.1])
+  }
+}))</code></pre>
 
 <pre><code>var continuous_erp_3d = ParticleFilter(function() {
   return {
