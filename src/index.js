@@ -13,15 +13,23 @@ var $ = require('jquery');
 var vl = require('vega-lite');
 var vg = require('vega');
 
-function isErpWithSupport(x) {
+function isErp(x) {
   // TODO: take from dippl
-  return true;
+  return x.support && x.score;
 }
 
 var print = require('./old').print;
 
 var wait = function(ms,f) {
   setTimeout(f,ms);
+}
+
+var stringify = function(x) {
+  if (typeof x == 'object') {
+    return JSON.stringify(x)
+  } else {
+    return x + '';
+  }
 }
 
 var kindPrinter = {};
@@ -305,7 +313,6 @@ kindPrinter.crr = function(types, support, scores) {
 }
 
 
-
 var vegaPrint = function(obj) {
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
@@ -331,8 +338,9 @@ var vegaPrint = function(obj) {
     )
   };
 
-  if (isErpWithSupport(obj)) {
+  if (isErp(obj)) {
     var support = obj.support();
+    var supportStringified = obj.support().map(function(x) { return _.mapObject(x,stringify) });
     var scores = _.map(support,
                        function(state){return obj.score(null, state);});
 
@@ -348,10 +356,14 @@ var vegaPrint = function(obj) {
         .join('');
 
     if (_.has(kindPrinter, dfKind)) {
-      kindPrinter[dfKind](columnTypesDict, support, scores);
+      // NB: passes in supportStringified, not support
+      kindPrinter[dfKind](columnTypesDict, supportStringified, scores);
     } else {
+      console.log(dfKind)
       throw new Error('viz.print() doesn\'t know how to render objects of kind ' + dfKind);
     }
+
+    // TODO: fall back to table when obj is not a data frame
 
   }
 }
@@ -370,6 +382,7 @@ function parseVl(vlSpec) {
                   chart({el:resultContainer,renderer: 'svg'}).update();
                 });
 }
+
 
 // TODO: maybe a better function signature is
 // bar([{<key1>: ..., <key2>: ...])
@@ -524,7 +537,7 @@ var table = function(obj, options) {
     options = {}
   options = _.defaults(options, {log: false})
 
-  if (isErpWithSupport(obj)) {
+  if (isErp(obj)) {
     var support = obj.support();
     var scores = support.map(function(state) { return obj.score(null,state) });
 
