@@ -397,11 +397,20 @@ var bar = function(xs,ys, opts) {
   parseVl(vlSpec);
 }
 
-var hist = function(samples) {
-  var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
-  var labels = _(frequencyDict).keys();
-  var counts = _(frequencyDict).values();
-  bar(labels, counts, {xLabel: 'Value', yLabel: 'Frequency'})
+var hist = function(x) {
+  if (isErp(x)) {
+    var erp = x;
+    var labels = erp.support();
+    var labelsStringified = labels.map(function(x) { return JSON.stringify(x) })
+    var probs = labels.map(function(x) { return Math.exp(erp.score(null, x)) });
+    bar(labelsStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
+  } else {
+    var samples = x;
+    var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+    var labels = _(frequencyDict).keys();
+    var counts = _(frequencyDict).values();
+    bar(labels, counts, {xLabel: 'Value', yLabel: 'Frequency'})
+  }
 };
 
 // TODO: rename to scatter after porting erin's vizPrint code to vega
