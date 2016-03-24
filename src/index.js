@@ -571,7 +571,7 @@ var table = function(obj, options) {
       return -z[1]
     });
 
-    var tableString = '<table><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
+    var tableString = '<table class="wviz-table"><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
 
     sortedZipped.forEach(function(pair) {
       var state = pair[0];
