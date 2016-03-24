@@ -18,6 +18,27 @@ function isErp(x) {
   return x.support && x.score;
 }
 
+
+// a data frame is an array of objects where
+// all objects have the same keys
+function isDataFrame(arr) {
+  var first_keys = _.keys(arr[0]);
+  if (first_keys.length > 0) {
+    //check if same keys all the way through
+    for (var i=0; i<arr.length; i++) {
+      var ith_keys = _.keys(arr[i]);
+      for (var j=0; j<arr.length; j++) {
+        if (ith_keys[j] != first_keys[j]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  } else {
+    return false;
+  }
+}
+
 var print = require('./old').print;
 
 var wait = function(ms,f) {
@@ -340,6 +361,11 @@ var vegaPrint = function(obj) {
 
   if (isErp(obj)) {
     var support = obj.support();
+
+    if (!isDataFrame(support)) {
+      return table(obj);
+    }
+
     var supportStringified = obj.support().map(function(x) { return _.mapObject(x,stringify) });
     var scores = _.map(support,
                        function(state){return obj.score(null, state);});
