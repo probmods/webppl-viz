@@ -475,6 +475,14 @@ var kde = function(samps, kernel) {
   return results;
 }
 
+var kde2d = function(samps) {
+  // mimics kde2d from the MASS package in R
+  // uses axis-aligned gaussian kernel
+
+
+}
+
+// TODO: should you be able to pass this an erp too?
 var density = function(samples) {
   var densityEstimate = kde(samples);
 
