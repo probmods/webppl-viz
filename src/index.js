@@ -18,7 +18,6 @@ function isErp(x) {
   return x.support && x.score;
 }
 
-
 // a data frame is an array of objects where
 // all objects have the same keys
 function isDataFrame(arr) {

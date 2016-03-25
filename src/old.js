@@ -1,18 +1,8 @@
 var fs = require('fs');
-var insertCss = require('insert-css');
 
 var numPlots = 0;
 
-var cssInjected = false;
-
-var cssFileContents = fs.readFileSync(__dirname + '/../demo/viz.css', 'utf8');
-
 function print(x) {
-  // TODO: remove this once i switch print() to vega
-  if (!cssInjected) {
-    insertCss(cssFileContents)
-    cssInjected = true;
-  }
 
   // name the plots to keep compatibility with the rest of erin's code
   var _resultDiv = wpEditor.makeResultContainer();
