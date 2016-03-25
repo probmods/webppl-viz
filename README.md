@@ -8,11 +8,11 @@ Dependencies:
 
 Demo: http://probmods.github.io/webppl-viz/
 
-Usage:
+Usage: include webppl-viz.js and webppl-viz.css in your page (along with webppl and webppl-editor), then you can do:
 
 ```js
-// automatically visualize a (possibly multivariate) inference result using some heuristics
 viz.print(MH(function() { return {x: gaussian(0,1), y: beta(1,1)}}), 100)
+// automatically visualize a (possibly multivariate) inference result using some heuristics
 // (in this case, it shows the marginals on x and y as well as the joint)
 
 viz.bar([1,2,3],[4,5,6]) // bar chart
