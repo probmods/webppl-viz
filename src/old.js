@@ -4,6 +4,12 @@ var numPlots = 0;
 
 function print(x) {
 
+  //wpEditor is not present if not run in the browser
+  if (typeof(wpEditor) === 'undefined') { 
+    console.log("viz.print: no wpEditor, not drawing");
+    return;
+  }
+
   // name the plots to keep compatibility with the rest of erin's code
   var _resultDiv = wpEditor.makeResultContainer();
   var resultDiv = $(_resultDiv);
