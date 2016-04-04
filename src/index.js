@@ -46,7 +46,7 @@ var wait = function(ms,f) {
 
 // i think i need this for proper axis labels when states are objects
 // but you don't want this turning numbers into strings either
-var stringifyObject = function(x) {
+var stringifyIfObject = function(x) {
   if (typeof x == 'object') {
     return JSON.stringify(x)
   } else {
@@ -367,7 +367,7 @@ var vegaPrint = function(obj) {
       return table(obj);
     }
 
-    var supportStringified = obj.support().map(function(x) { return _.mapObject(x,stringifyObject) });
+    var supportStringified = obj.support().map(function(x) { return _.mapObject(x,stringifyIfObject) });
     var scores = _.map(support,
                        function(state){return obj.score(null, state);});
 
