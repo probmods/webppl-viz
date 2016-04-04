@@ -44,11 +44,14 @@ var wait = function(ms,f) {
   setTimeout(f,ms);
 }
 
+// i think i need this for proper axis labels when states are objects
+// but you don't want this turning numbers into strings either
+// TODO: rename function
 var stringify = function(x) {
   if (typeof x == 'object') {
     return JSON.stringify(x)
   } else {
-    return x + '';
+    return x;
   }
 }
 
