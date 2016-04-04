@@ -433,7 +433,7 @@ var vegaPrint = function(obj) {
     });
   }
 
-  if (isPseudoDataFrame(support)) {
+  if (!isDataFrame(support) && isPseudoDataFrame(support)) {
     support = support.map(function(x) {
       var n = x.length;
       var keys = _.range(0,n).map(function(i) { return 'state_' + i + ''});
