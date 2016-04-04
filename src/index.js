@@ -416,6 +416,9 @@ var vegaPrint = function(obj) {
     return table(obj);
   }
 
+  var scores = _.map(support,
+                     function(state){return obj.score(null, state);});
+
   if (isVector(support)) {
     // promote vector into data frame with a single column ("state")
     // so that we can directly use kindPrinter.c or kindPrinter.r
@@ -423,10 +426,6 @@ var vegaPrint = function(obj) {
       return {state: x}
     });
   }
-
-  var scores = _.map(support,
-                       function(state){return obj.score(null, state);});
-
 
   var supportStringified = support.map(function(x) { return _.mapObject(x,stringifyIfObject) });
 
