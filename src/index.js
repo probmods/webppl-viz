@@ -398,7 +398,7 @@ var vegaPrint = function(obj) {
 
 function parseVl(vlSpec) {
   //wpEditor is not present if not run in the browser
-  if (typeof(wpEditor) === 'undefined') { 
+  if (typeof(wpEditor) === 'undefined') {
     console.log("viz.print: no wpEditor, not drawing");
     return;
   }
@@ -568,7 +568,7 @@ var line = function(xs, ys) {
 // and smart hiding if there are too many rows
 var table = function(obj, options) {
   //wpEditor is not present if not run in the browser
-  if (typeof(wpEditor) === 'undefined') { 
+  if (typeof(wpEditor) === 'undefined') {
     console.log("viz.print: no wpEditor, not drawing");
     return;
   }
