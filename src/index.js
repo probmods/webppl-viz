@@ -64,14 +64,20 @@ function isPseudoDataFrame(arr, strict /* default true*/) {
   var subArrayLengths = arr.map(function(x) { return x.length});
 
   var subArrayLengthsOk = _.unique(subArrayLengths).length == 1;
+  if (!subArrayLengthsOk) {
+    return false;
+  }
 
   var n = subArrayLengths[0];
 
   // OPTIMIZE
-  var columns = _.range(0,n).map(function(colNum) {
-    return _.pluck(arr, colNum + '');
+  var columnTypesOk = _.range(0,n).map(function(colNum) {
+    var values =  _.pluck(arr, colNum + '');
+    var types = _.map(values, function(v) { return typeof(v) })
+    return _.unique(types).length == 1;
   })
 
+  return _.every(columnTypesOk);
 }
 
 var print = require('./old').print;
@@ -425,6 +431,14 @@ var vegaPrint = function(obj) {
     support = support.map(function(x) {
       return {state: x}
     });
+  }
+
+  if (isPseudoDataFrame(support)) {
+    support = support.map(function(x) {
+      var n = x.length;
+      var keys = _.range(0,n).map(function(i) { return 'state_' + i + ''});
+      return _.object(keys, x);
+    })
   }
 
   var supportStringified = support.map(function(x) { return _.mapObject(x,stringifyIfObject) });
