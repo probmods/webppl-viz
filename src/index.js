@@ -38,6 +38,42 @@ function isDataFrame(arr) {
   }
 }
 
+function isVector(arr) {
+  var anyStructuredObjects = false;
+  // first check case 1
+  for(var i = 0, n = arr.length; i < n; i++) {
+    if (_.isObject(arr[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// a pseudo data frame is either
+// 1. an array of values OR
+// 2. an array of subarrays where:
+//      each subarray represents a row in a table
+//      all subarrays have the same length and same type
+function isPseudoDataFrame(arr, strict /* default true*/) {
+
+  if (strict === undefined) {
+    strict = true;
+  }
+
+  // TODO: if non-strict, subarray lengths can be different but types must still match
+  var subArrayLengths = arr.map(function(x) { return x.length});
+
+  var subArrayLengthsOk = _.unique(subArrayLengths).length == 1;
+
+  var n = subArrayLengths[0];
+
+  // OPTIMIZE
+  var columns = _.range(0,n).map(function(colNum) {
+    return _.pluck(arr, colNum + '');
+  })
+
+}
+
 var print = require('./old').print;
 
 var wait = function(ms,f) {
@@ -334,7 +370,7 @@ kindPrinter.crr = function(types, support, scores) {
   parseVl(vlSpec);
 }
 
-
+// automatically render an ERP
 var vegaPrint = function(obj) {
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
@@ -360,41 +396,65 @@ var vegaPrint = function(obj) {
     )
   };
 
-  if (isErp(obj)) {
-    var support = obj.support();
+  if (!isErp(obj)) {
+    // TODO: write wpEditor.warn method, use it to inform user that vegaPrint only works on ERPs
+    // (though maybe this isn't necessary since we are using __print__ decorator in wp-editor?)
+    return null;
+  }
 
-    if (!isDataFrame(support)) {
-      return table(obj);
-    }
+  var support = obj.support();
+  var supportStructure = (isVector(support)
+                          ? 'vector'
+                          : (isPseudoDataFrame(support)
+                             ? 'pseudodataframe'
+                             : (isDataFrame(support)
+                                ? 'dataframe'
+                                : 'other')));
 
-    var supportStringified = obj.support().map(function(x) { return _.mapObject(x,stringifyIfObject) });
-    var scores = _.map(support,
+  // fall back to table when support is not nicely structured
+  if (supportStructure == 'other') {
+    return table(obj);
+  }
+
+  if (isVector(support)) {
+    // promote vector into data frame with a single column ("state")
+    // so that we can directly use kindPrinter.c or kindPrinter.r
+    support = support.map(function(x) {
+      return {state: x}
+    });
+  }
+
+  var scores = _.map(support,
                        function(state){return obj.score(null, state);});
 
-    var columnTypesDict = getColumnTypes(support);
 
-    // the *kind* of a dataframe is the set of its
-    // column types,
-    // e.g., the type of [{a: 2.5, b: 'foo'}, {a: 3.1, b: 'bar'}]
-    // is cr
-    var dfKind = _.values(columnTypesDict)
-        .map(function(str) { return str.substring(0,1) })
-        .sort()
-        .join('');
+  var supportStringified = support.map(function(x) { return _.mapObject(x,stringifyIfObject) });
 
-    if (_.has(kindPrinter, dfKind)) {
-      // NB: passes in supportStringified, not support
-      kindPrinter[dfKind](columnTypesDict, supportStringified, scores);
-    } else {
-      console.log(dfKind)
-      throw new Error('viz.print() doesn\'t know how to render objects of kind ' + dfKind);
-    }
+  var columnTypesDict = getColumnTypes(support);
 
-    // TODO: fall back to table when obj is not a data frame
+  // the *kind* of a dataframe is the set of its
+  // column types,
+  // e.g., the type of [{a: 2.5, b: 'foo'}, {a: 3.1, b: 'bar'}]
+  // is cr
+  var dfKind = _.values(columnTypesDict)
+      .map(function(str) { return str.substring(0,1) })
+    .sort()
+      .join('');
 
+  // TODO: switch to warning rather than error
+  // (and maybe use wpEditor.put to get data)
+  if (_.has(kindPrinter, dfKind)) {
+    // NB: passes in supportStringified, not support
+    kindPrinter[dfKind](columnTypesDict, supportStringified, scores);
+  } else {
+    console.log(dfKind)
+    throw new Error('viz.print() doesn\'t know how to render objects of kind ' + dfKind);
   }
+
+
 }
 
+// parse a vega-lite description and render it
 function parseVl(vlSpec) {
   //wpEditor is not present if not run in the browser
   if (typeof(wpEditor) === 'undefined') {

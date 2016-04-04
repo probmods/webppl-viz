@@ -72,6 +72,12 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
   return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}
 }, 500))</code></pre>
 
+    (c):
+    <pre><code>viz.vegaPrint(ParticleFilter(function() {
+  return categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])
+}, 500))</code></pre>
+
+
     r:
     <pre><code>viz.vegaPrint(ParticleFilter(function() {
   return {x: beta(3,2)};
