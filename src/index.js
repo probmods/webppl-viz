@@ -394,6 +394,12 @@ var vegaPrint = function(obj) {
 }
 
 function parseVl(vlSpec) {
+  //wpEditor is not present if not run in the browser
+  if (typeof(wpEditor) === 'undefined') { 
+    console.log("viz.print: no wpEditor, not drawing");
+    return;
+  }
+
   var vgSpec = vl.compile(vlSpec).spec;
 
   var resultContainer = wpEditor.makeResultContainer();
@@ -558,6 +564,12 @@ var line = function(xs, ys) {
 // TODO, maybe one day: make this a fancy react widget with sortable columns
 // and smart hiding if there are too many rows
 var table = function(obj, options) {
+  //wpEditor is not present if not run in the browser
+  if (typeof(wpEditor) === 'undefined') { 
+    console.log("viz.print: no wpEditor, not drawing");
+    return;
+  }
+
   if (options === undefined)
     options = {}
   options = _.defaults(options, {log: false})
