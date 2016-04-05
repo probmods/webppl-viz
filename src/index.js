@@ -131,7 +131,7 @@ kindPrinter.r = function(types, support, scores) {
     }
   };
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 
 }
 
@@ -158,7 +158,7 @@ kindPrinter.cc = function(types, support, scores) {
     config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
   }
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 kindPrinter.cr = function(types, support, scores) {
@@ -213,7 +213,7 @@ kindPrinter.cr = function(types, support, scores) {
     }
   };
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 
 }
 
@@ -241,7 +241,7 @@ kindPrinter.rr = function(types, support, scores) {
     config: {numberFormat: ".1e"}
   }
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 
@@ -277,7 +277,7 @@ kindPrinter.ccc = function(types, support, scores) {
              config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
            }
 
-           parseVl(vlSpec);
+           renderVlSpec(vlSpec);
          });
 
   // todo
@@ -340,7 +340,7 @@ kindPrinter.ccr = function(types, support, scores) {
     }
   };
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 
 }
 
@@ -373,7 +373,7 @@ kindPrinter.crr = function(types, support, scores) {
     config: {numberFormat: ".1e"}
   }
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 // automatically render an ERP
@@ -468,14 +468,24 @@ var vegaPrint = function(obj) {
 }
 
 // parse a vega-lite description and render it
-function parseVl(vlSpec) {
+function renderVlSpec(spec) {
   //wpEditor is not present if not run in the browser
   if (typeof(wpEditor) === 'undefined') {
     console.log("viz.print: no wpEditor, not drawing");
     return;
   }
 
-  var vgSpec = vl.compile(vlSpec).spec;
+  // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
+  // data can be large)
+  if (!_.has(spec, 'config')) {
+    spec.config = {numberFormat: '.1e'}
+  } else {
+    if (!_.has(spec.config, 'numberFormat')) {
+      spec.config.numberFormat = '.1e';
+    }
+  }
+
+  var vgSpec = vl.compile(spec).spec;
 
   var resultContainer = wpEditor.makeResultContainer();
   var tempDiv = document.createElement('div');
@@ -513,7 +523,7 @@ var bar = function(xs,ys, opts) {
     config: {numberFormat: "f"}
   };
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 var hist = function(x) {
@@ -551,7 +561,7 @@ var _scatter = function(xs, ys, opts) {
     }
   }
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 // TODO: density visualizations can be misleading at the bounds
@@ -615,7 +625,7 @@ var density = function(samples) {
     "config": {"mark": {"interpolate": "monotone"}}
   };
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 // TODO: show points
@@ -631,7 +641,7 @@ var line = function(xs, ys) {
     }
   };
 
-  parseVl(vlSpec);
+  renderVlSpec(vlSpec);
 }
 
 // visualize an erp as a table
