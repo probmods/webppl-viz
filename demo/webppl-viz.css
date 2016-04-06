@@ -104,6 +104,10 @@ svg {
     list-style-type: none;
 }
 
+.actions li {
+    cursor: pointer
+}
+
 .actions.expanded {
     width: auto;
     height: auto;
@@ -112,6 +116,11 @@ svg {
     background-color: rgba(1,1,1,0.8);
     transition: background-color 0.4s;
     color: white
+}
+
+.actions a {
+    color: white;
+    text-decoration: none;
 }
 
 .graphComponent .content {

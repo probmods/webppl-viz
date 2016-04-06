@@ -15,6 +15,7 @@ var vg = require('vega');
 
 var React = require('react');
 var ReactDOM = require('react-dom');
+var md5 = require('md5');
 
 function isErp(x) {
   // TODO: take from dippl
@@ -471,16 +472,29 @@ var vegaPrint = function(obj) {
 }
 
 var GraphComponent = React.createClass({
+  getInitialState: function() {
+    return {view: 0}
+  },
   toggleSettings: function() {
     $(this.refs.wrench).toggleClass('white');
     $(this.refs.actions).toggleClass('expanded');
   },
   render: function() {
+    var graphContent = (this.state.view == 0
+                        ? null
+                        : this.state.view.toImageURL('svg'));
+
+    var graphName = (graphContent == null
+                     ? null
+                     : md5(graphContent || "").substring(0,6) + '.svg');
+
+    // NB: download doesn't work perfectly in safari (it just spawns the picture in a new tab)
+    // but that's how it works for the vega online editor too, so leave it here for now
     return (<div className='graphComponent'>
             <div ref='actions' className='actions'>
             <button ref='wrench' className="settings" onClick={this.toggleSettings}></button>
             <ul>
-            <li>download graph</li>
+            <li><a href={graphContent} download={graphName} target="_blank">download graph</a></li>
             <li>download data</li>
             <li>resize</li>
             </ul>
@@ -517,15 +531,23 @@ function renderVlSpec(spec) {
 
   var resultContainer = wpEditor.makeResultContainer();
 
-  var r = React.createElement(GraphComponent)
+  var r = React.createElement(GraphComponent);
 
+  // different possible architectures:
+  // - render before making React component, call update(), and pass result as prop
+  // - React component takes vega spec (not vega-lite spec) as prop and calls update() itself
+  //
+  // considerations:
+  // - might want to visualize streamed data that comes from inference callback
+  // - might want to support interaction like brushing, linking (it's not clear to me how orthogonal Reactive Vega is to React)
   ReactDOM.render(r, resultContainer, function() {
+    var comp = this;
     var node = this.refs.content;
 
     vg.parse.spec(vgSpec,
                   function(error, chart) {
                     $(node).empty();
-                    chart({el:node, renderer: 'svg'}).update();
+                    comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
                   });
 
   })
