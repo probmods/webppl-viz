@@ -13,6 +13,9 @@ var $ = require('jquery');
 var vl = require('vega-lite');
 var vg = require('vega');
 
+var React = require('react');
+var ReactDOM = require('react-dom');
+
 function isErp(x) {
   // TODO: take from dippl
   return x.support && x.score;
@@ -451,7 +454,7 @@ var vegaPrint = function(obj) {
   // is cr
   var dfKind = _.values(columnTypesDict)
       .map(function(str) { return str.substring(0,1) })
-    .sort()
+      .sort()
       .join('');
 
   // TODO: switch to warning rather than error
@@ -466,6 +469,27 @@ var vegaPrint = function(obj) {
 
 
 }
+
+var GraphComponent = React.createClass({
+  toggleSettings: function() {
+    $(this.refs.wrench).toggleClass('white');
+    $(this.refs.actions).toggleClass('expanded');
+  },
+  render: function() {
+    return (<div className='graphComponent'>
+            <div ref='actions' className='actions'>
+            <button ref='wrench' className="settings" onClick={this.toggleSettings}></button>
+            <ul>
+            <li>download graph</li>
+            <li>download data</li>
+            <li>resize</li>
+            </ul>
+            </div>
+            <div ref='content' className='content'></div>
+            <div className='clearboth'></div>
+            </div>)
+  }
+})
 
 // parse a vega-lite description and render it
 function renderVlSpec(spec) {
@@ -485,20 +509,28 @@ function renderVlSpec(spec) {
     }
   }
 
+  // TODO:
+  // for each quantitative field that is displayed, pick a better number format
+  // (ideally, do this to the axis labels, not all the data)
+
   var vgSpec = vl.compile(spec).spec;
 
   var resultContainer = wpEditor.makeResultContainer();
-  var tempDiv = document.createElement('div');
 
-  $(resultContainer).text('rendering...')
+  var r = React.createElement(GraphComponent)
 
-  vg.parse.spec(vgSpec,
-                function(error, chart) {
-                  $(resultContainer).empty();
-                  chart({el:resultContainer,renderer: 'svg'}).update();
-                });
+  ReactDOM.render(r, resultContainer, function() {
+    var node = this.refs.content;
+
+    vg.parse.spec(vgSpec,
+                  function(error, chart) {
+                    $(node).empty();
+                    chart({el:node, renderer: 'svg'}).update();
+                  });
+
+  })
+
 }
-
 
 // TODO: maybe a better function signature is
 // bar([{<key1>: ..., <key2>: ...])
@@ -526,6 +558,8 @@ var bar = function(xs,ys, opts) {
   renderVlSpec(vlSpec);
 }
 
+// currently hist operates on a collection of samples as well
+// (e.g., from repeat)
 var hist = function(x) {
   if (isErp(x)) {
     var erp = x;
