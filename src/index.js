@@ -573,15 +573,22 @@ var GraphComponent = React.createClass({
     alert('not yet implemented')
   },
   render: function() {
-    var graphContent = (this.state.view == 0
+    var dataStringified = JSON.stringify(this.props.data,null,2);
+    var blob = new Blob([dataStringified], {type: 'application/json'})
+    var dataUrl = URL.createObjectURL(blob);
+
+    var dataName = md5(dataStringified).substring(0,6) + ".json";
+
+
+    var graphUrl = (this.state.view == 0
                         ? null
                         : this.state.view.toImageURL('svg'));
 
-    var graphName = (graphContent == null
+    var graphName = (graphUrl == null
                      ? null
-                     : md5(graphContent || "").substring(0,6) + '.svg');
+                     : md5(graphUrl || "").substring(0,6) + '.svg');
 
-    var dataContent = null, dataName = null;
+
     // var dataContent = (this.state.view == 0
     //                    ? null
     //                    : this.state.v + ".csv"
@@ -593,8 +600,8 @@ var GraphComponent = React.createClass({
             <div ref='actions' className='actions'>
             <button ref='wrench' className="settings" onClick={this.toggleSettings}></button>
             <ul>
-            <li><a href={graphContent} download={graphName} target="_blank">download graph</a></li>
-            <li onClick={this.notYetImplemented}>download data</li>
+            <li><a href={graphUrl} download={graphName} target="_blank">download graph</a></li>
+            <li><a href={dataUrl} download={dataName} target="_blank">download data</a></li>
             <li onClick={this.notYetImplemented}>resize</li>
             </ul>
             </div>
@@ -630,7 +637,7 @@ function renderSpec(spec, regularVega) {
 
   var resultContainer = wpEditor.makeResultContainer();
 
-  var r = React.createElement(GraphComponent);
+  var r = React.createElement(GraphComponent, {data: vgSpec.data[0].values});
 
   // different possible architectures:
   // - render before making React component, call update(), and pass result as prop
