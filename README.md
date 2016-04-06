@@ -4,7 +4,7 @@ Some in-browser visualization functions for WebPPL
 
 Dependencies:
 - webppl version 0.6.1 or higher
-- webppl-editor commit 0b6fff8 or higher
+- webppl-editor commit 657d1c or later
 
 Demo: http://probmods.github.io/webppl-viz/
 
