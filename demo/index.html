@@ -137,7 +137,13 @@ viz.density(repeat(1e2, function() { return gaussian(0,1) }))</code></pre>
 },5000))</code></pre>
 
     rrr:
-    <pre><code>todo</code></pre>
+    <pre><code>viz.vegaPrint(MH(function() {
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+  var z = uniform(0,1);
+  factor(Math.log(Math.abs(x-y) + Math.abs(x-z)))
+  return {x: x, y: y, z: z};
+},250))</code></pre>
 
 
   </div>

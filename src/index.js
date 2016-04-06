@@ -135,7 +135,7 @@ kindPrinter.r = function(types, support, scores) {
     }
   };
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 
 }
 
@@ -162,7 +162,7 @@ kindPrinter.cc = function(types, support, scores) {
     config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
   }
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 }
 
 kindPrinter.cr = function(types, support, scores) {
@@ -217,7 +217,7 @@ kindPrinter.cr = function(types, support, scores) {
     }
   };
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 
 }
 
@@ -245,7 +245,7 @@ kindPrinter.rr = function(types, support, scores) {
     config: {numberFormat: ".1e"}
   }
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 }
 
 
@@ -281,7 +281,7 @@ kindPrinter.ccc = function(types, support, scores) {
              config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
            }
 
-           renderVlSpec(vlSpec);
+           renderSpec(vlSpec);
          });
 
   // todo
@@ -344,7 +344,7 @@ kindPrinter.ccr = function(types, support, scores) {
     }
   };
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 
 }
 
@@ -377,7 +377,95 @@ kindPrinter.crr = function(types, support, scores) {
     config: {numberFormat: ".1e"}
   }
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
+}
+
+kindPrinter.rrr = function(types, support, scores) {
+  var fieldNames = _.keys(support[0]);
+  var field1Name = fieldNames[0];
+  var field2Name = fieldNames[1];
+  var field3Name = fieldNames[2];
+
+  var data = _.zip(support, scores).map(function(x) {
+    return _.extend({prob: Math.exp(x[1])}, x[0])
+  })
+
+  var overallScale = {name: "ord",
+                      type: "ordinal",
+                      points: true,
+                      range: "width",
+                      domain: fieldNames
+                  }
+  var individualScales = _.map(fieldNames,
+                               function(name) {
+                                 return {
+                                   name: name,
+                                   type: "linear",
+                                   range: "height",
+                                   zero: false,
+                                   nice: true,
+                                   domain: {data: 'values', field: name}
+                                 }
+                               });
+
+  var individualAxes = _.map(fieldNames,
+                             function(name) {
+                               return {
+                                 type: 'y',
+                                 scale: name,
+                                 offset: {scale: 'ord', value: name}
+                               }
+                             });
+
+  var vegaSpec = {
+    data: [{name: 'values', values: data},
+           {name: 'fields', values: fieldNames}],
+    scales: [overallScale].concat(individualScales),
+    axes: individualAxes,
+    "marks": [
+      {
+        "type": "group",
+        "from": {"data": "values"},
+        "marks": [
+          {
+            "type": "line",
+            "from": {"data": "fields"},
+            "properties": {
+              "enter": {
+                "x": {"scale": "ord", "field": "data"},
+                "y": {
+                  "scale": {"datum": "data"},
+                  "field": {"parent": {"datum": "data"}}
+                },
+                "stroke": {"value": "steelblue"},
+                "strokeWidth": {"value": 1},
+                "strokeOpacity": {"value": 0.3}
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "from": {"data": "fields"},
+        "properties": {
+          "enter": {
+            "x": {"scale": "ord", "field": "data", "offset":-8},
+            "y": {"field": {"group": "height"}, "offset": 6},
+            "fontWeight": {"value": "bold"},
+            "fill": {"value": "black"},
+            "text": {"field": "data"},
+            "align": {"value": "right"},
+            "baseline": {"value": "top"}
+          }
+        }
+      }
+    ]
+  }
+
+  // TODO: render vega spec (not vega-lite)
+  renderSpec(vegaSpec, "regularVega")
+
 }
 
 // automatically render an ERP
@@ -479,6 +567,11 @@ var GraphComponent = React.createClass({
     $(this.refs.wrench).toggleClass('white');
     $(this.refs.actions).toggleClass('expanded');
   },
+  notYetImplemented: function() {
+    // TODO: data that flows into vega-lite spec is already transformed..
+    // want the backing
+    alert('not yet implemented')
+  },
   render: function() {
     var graphContent = (this.state.view == 0
                         ? null
@@ -488,6 +581,12 @@ var GraphComponent = React.createClass({
                      ? null
                      : md5(graphContent || "").substring(0,6) + '.svg');
 
+    var dataContent = null, dataName = null;
+    // var dataContent = (this.state.view == 0
+    //                    ? null
+    //                    : this.state.v + ".csv"
+    //                   )
+
     // NB: download doesn't work perfectly in safari (it just spawns the picture in a new tab)
     // but that's how it works for the vega online editor too, so leave it here for now
     return (<div className='graphComponent'>
@@ -495,8 +594,8 @@ var GraphComponent = React.createClass({
             <button ref='wrench' className="settings" onClick={this.toggleSettings}></button>
             <ul>
             <li><a href={graphContent} download={graphName} target="_blank">download graph</a></li>
-            <li>download data</li>
-            <li>resize</li>
+            <li onClick={this.notYetImplemented}>download data</li>
+            <li onClick={this.notYetImplemented}>resize</li>
             </ul>
             </div>
             <div ref='content' className='content'></div>
@@ -506,7 +605,7 @@ var GraphComponent = React.createClass({
 })
 
 // parse a vega-lite description and render it
-function renderVlSpec(spec) {
+function renderSpec(spec, regularVega) {
   //wpEditor is not present if not run in the browser
   if (typeof(wpEditor) === 'undefined') {
     console.log("viz.print: no wpEditor, not drawing");
@@ -527,7 +626,7 @@ function renderVlSpec(spec) {
   // for each quantitative field that is displayed, pick a better number format
   // (ideally, do this to the axis labels, not all the data)
 
-  var vgSpec = vl.compile(spec).spec;
+  var vgSpec = regularVega ? spec : vl.compile(spec).spec;
 
   var resultContainer = wpEditor.makeResultContainer();
 
@@ -540,6 +639,7 @@ function renderVlSpec(spec) {
   // considerations:
   // - might want to visualize streamed data that comes from inference callback
   // - might want to support interaction like brushing, linking (it's not clear to me how orthogonal Reactive Vega is to React)
+  // - if structure is the same... show animation interpolating between previous result and current?
   ReactDOM.render(r, resultContainer, function() {
     var comp = this;
     var node = this.refs.content;
@@ -577,7 +677,7 @@ var bar = function(xs,ys, opts) {
     config: {numberFormat: "f"}
   };
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 }
 
 // currently hist operates on a collection of samples as well
@@ -617,7 +717,7 @@ var _scatter = function(xs, ys, opts) {
     }
   }
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 }
 
 // TODO: density visualizations can be misleading at the bounds
@@ -681,7 +781,7 @@ var density = function(samples) {
     "config": {"mark": {"interpolate": "monotone"}}
   };
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 }
 
 // TODO: show points
@@ -697,7 +797,7 @@ var line = function(xs, ys) {
     }
   };
 
-  renderVlSpec(vlSpec);
+  renderSpec(vlSpec);
 }
 
 // visualize an erp as a table
