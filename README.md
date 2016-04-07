@@ -18,6 +18,7 @@ Shows an ERP as a textual table.
 Function signatures:
 
 - `viz.table(erp, [options])`
+- `viz.table(samples, [options])`
 
 Options:
 
