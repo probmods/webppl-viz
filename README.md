@@ -44,6 +44,12 @@ Options:
 
 - `binwidth` (defaults to 0). TODO.
 
+### Line chart
+
+Function signatures:
+
+- `viz.line(xs, ys)`
+
 ### Scatter plot
 
 Function signatures:
