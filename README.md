@@ -33,7 +33,7 @@ Options:
 
 - `horizontal` (default: false). Draw a horizontal bar chart rather than vertical one.
 - `xLabel` (default: x). x axis label.
-- `yLabel` (default: x). x axis label.
+- `yLabel` (default: y). y axis label.
 
 ### Histogram
 
@@ -56,7 +56,12 @@ Function signatures:
 
 Function signatures:
 
-- `viz.scatter(xs,ys)`
+- `viz.scatter(xs, ys, options)`
+
+Options:
+
+- `xLabel` (default: x). x axis label.
+- `yLabel` (default: y). y axis label.
 
 ### Density curve
 

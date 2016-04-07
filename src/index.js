@@ -736,10 +736,10 @@ var hist = function(x) {
 };
 
 // TODO: rename to scatter after porting erin's vizPrint code to vega
-var _scatter = function(xs, ys, opts) {
-  opts = _.defaults(opts || {},
-                    {xLabel: 'x',
-                     yLabel: 'y'});
+var _scatter = function(xs, ys, options) {
+  options = _.defaults(options || {},
+                       {xLabel: 'x',
+                        yLabel: 'y'});
 
   var data = _.zip(xs,ys).map(function(pair) {
     return {x: pair[0], y: pair[1]}
@@ -749,8 +749,8 @@ var _scatter = function(xs, ys, opts) {
     "data": {"values": data},
     "mark": "point",
     "encoding": {
-      "x": {"field": "x","type": "quantitative", axis: {title: opts.xLabel}},
-      "y": {"field": "y","type": "quantitative", axis: {title: opts.yLabel}}
+      "x": {"field": "x","type": "quantitative", axis: {title: options.xLabel}},
+      "y": {"field": "y","type": "quantitative", axis: {title: options.yLabel}}
     }
   }
 
