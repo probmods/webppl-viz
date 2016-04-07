@@ -96,6 +96,7 @@ First, a bit of notation: `c` stands for categorical variables and `r` for real 
 
 Some examples of types for different supports:
 
+- Every support element is a string → type is `c`
 - Every support element is an integer → type is `c`
 - Every support element is a real number → type is `r`
 - Every support element is an object `{k1: <a>, k2: <b>}` → `<a><b>`
