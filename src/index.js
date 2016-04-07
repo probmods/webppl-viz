@@ -112,8 +112,6 @@ kindPrinter.c = function(types, support, scores) {
   bar(values, probs, {xLabel: fieldName, yLabel: 'frequency'})
 }
 
-// TODO: visualizing [{x: foo}, {x: bar}, {x: baz}]
-// should be the same as visualizing [foo, bar, baz]
 kindPrinter.r = function(types, support, scores) {
   var fieldNames = _.keys(support[0]);
   var fieldName = fieldNames[0];
