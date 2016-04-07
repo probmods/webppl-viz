@@ -568,11 +568,12 @@ var GraphComponent = React.createClass({
     $(this.refs.actions).toggleClass('expanded');
   },
   notYetImplemented: function() {
-    // TODO: data that flows into vega-lite spec is already transformed..
-    // want the backing
     alert('not yet implemented')
   },
   render: function() {
+    // TODO: data that flows into vega-lite spec is already transformed..
+    // also add option to download the raw data?
+
     var dataStringified = JSON.stringify(this.props.data,null,2);
     var blob = new Blob([dataStringified], {type: 'application/json'})
     var dataUrl = URL.createObjectURL(blob);
