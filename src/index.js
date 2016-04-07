@@ -749,11 +749,20 @@ var _scatter = function(xs, ys, opts) {
 // input: a list of samples and, optionally, a kernel function
 // output: a list of estimated densities (range is min to max and number
 // of bins is (max-min) / (1.06 * s * n^(-.02))
-var kde = function(samps, kernel) {
-  if (kernel === undefined || typeof kernel !== 'function') {
+function kde(samps, options) {
+  options = _.defaults(options || {},
+                       {bounds: 'auto',
+                        kernel: 'epanechnikov'
+                       })
+
+  var kernel;
+  // TODO: add more kernels
+  if (options.kernel === 'epanechnikov') {
     kernel = function(u) {
       return Math.abs(u) <= 1 ? .75 * (1 - u * u) : 0;
     };
+  } else if (typeof options.kernel == 'function') {
+    kernel = options.kernel
   }
 
   // get optimal bandwidth
@@ -767,8 +776,14 @@ var kde = function(samps, kernel) {
 
   var bandwidth = 1.06 * s * Math.pow(n, -0.2);
 
-  var min = _.min(samps);
-  var max = _.max(samps);
+  var min, max;
+  if (options.bounds == 'auto') {
+    min = _.min(samps);
+    max = _.max(samps);
+  } else {
+    min = options.bounds[0];
+    max = options.bounds[1];
+  }
 
   var numBins = 100;
 
@@ -793,14 +808,33 @@ var kde2d = function(samps) {
 }
 
 // TODO: should you be able to pass this an erp too?
-var density = function(samples) {
-  var densityEstimate = kde(samples);
+// TODO: rename as kde
+function density(samples, options) {
+  options = _.defaults(options || {},
+                       {bounds: 'auto'})
+
+  var min, max;
+  if (options.bounds == 'auto') {
+    min = _.min(samples)
+    max = _.max(samples)
+  } else {
+    min = options.bounds[0];
+    max = options.bounds[1];
+  }
+
+  var densityEstimate = kde(samples, options);
+
+  debugger;
 
   var vlSpec = {
     "data": {values: densityEstimate},
     "mark": "area",
     "encoding": {
-      "x": {"field": "item", "type": "quantitative", axis: {title: 'Value'}},
+      "x": {"field": "item",
+            "type": "quantitative",
+            axis: {title: 'Value'},
+            scale: {domain: [min,max]}
+           },
       "y": {"field": "density","type": "quantitative", axis: {title: 'Density'}}
     },
     "config": {"mark": {"interpolate": "monotone"}}
