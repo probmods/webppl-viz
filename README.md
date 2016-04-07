@@ -92,16 +92,16 @@ Options:
 
 ### Data types
 
-First, a bit of notation: `c` stands for categorical variables and `r` for real variables (for now, ordinal variables count as categorical).
+First, a bit of notation: `c` stands for categorical variables and `r` for real variables (for now, ordinal variables are treated as categorical).
 
 Some examples of types for different supports:
 
 - Every support element is an integer → type is `c`
-- Every support element is an integer → type is `r`
+- Every support element is a real number → type is `r`
 - Every support element is an object `{k1: <a>, k2: <b>}` → `<a><b>`
-	- (e.g., if `<a>` is of type `r` and `<b>` is of type `c`, then the type is `rc`)
+	- (e.g., if `<a>` is `r` and `<b>` is `c`, then the type is `rc`)
 - Every support element is an array `[<a>,<b>]` → type is `<a><b>`
-	- (e.g., if `<a>` is of type `r` and `<b>` is of type `c`, then the type is `rc`)
+	- (e.g., if `<a>` is `r` and `<b>` is `c`, then the type is `rc`)
 
 ### Type renderings
 
