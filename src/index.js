@@ -569,29 +569,24 @@ var GraphComponent = React.createClass({
     alert('not yet implemented')
   },
   render: function() {
-    // TODO: data that flows into vega-lite spec is already transformed..
-    // also add option to download the raw data?
-
-    var dataStringified = JSON.stringify(this.props.data,null,2);
-    var blob = new Blob([dataStringified], {type: 'application/json'})
-    var dataUrl = URL.createObjectURL(blob);
-
+    // TODO: use a common hash and different suffixes?
+    // TODO: don't run these computations until they click the wrench? (save memory, cycles)
+    var dataStringified = JSON.stringify(this.props.spec.data[0].values, null, 2);
+    var dataBlob = new Blob([dataStringified], {type: 'application/json'})
+    var dataUrl = URL.createObjectURL(dataBlob);
     var dataName = md5(dataStringified).substring(0,6) + ".json";
 
+    var vegaStringified = JSON.stringify(this.props.spec, null, 2);
+    var vegaBlob = new Blob([vegaStringified], {type: 'application/json'})
+    var vegaUrl = URL.createObjectURL(vegaBlob);
+    var vegaName = md5(vegaStringified).substring(0,6) + ".vega.json";
 
     var graphUrl = (this.state.view == 0
                         ? null
                         : this.state.view.toImageURL('svg'));
-
     var graphName = (graphUrl == null
                      ? null
                      : md5(graphUrl || "").substring(0,6) + '.svg');
-
-
-    // var dataContent = (this.state.view == 0
-    //                    ? null
-    //                    : this.state.v + ".csv"
-    //                   )
 
     // NB: download doesn't work perfectly in safari (it just spawns the picture in a new tab)
     // but that's how it works for the vega online editor too, so leave it here for now
@@ -601,6 +596,7 @@ var GraphComponent = React.createClass({
             <ul>
             <li><a href={graphUrl} download={graphName} target="_blank">download graph</a></li>
             <li><a href={dataUrl} download={dataName} target="_blank">download data</a></li>
+            <li><a href={vegaUrl} download={vegaName} target="_blank">download vega</a></li>
             <li onClick={this.notYetImplemented}>resize</li>
             </ul>
             </div>
@@ -636,7 +632,7 @@ function renderSpec(spec, regularVega) {
 
   var resultContainer = wpEditor.makeResultContainer();
 
-  var r = React.createElement(GraphComponent, {data: vgSpec.data[0].values});
+  var r = React.createElement(GraphComponent, {spec: vgSpec});
 
   // different possible architectures:
   // - render before making React component, call update(), and pass result as prop
@@ -649,10 +645,12 @@ function renderSpec(spec, regularVega) {
   ReactDOM.render(r, resultContainer, function() {
     var comp = this;
     var node = this.refs.content;
+    $(node).text('   rendering...');
 
     vg.parse.spec(vgSpec,
                   function(error, chart) {
                     $(node).empty();
+
                     comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
                   });
 
