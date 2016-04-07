@@ -786,13 +786,14 @@ function kde(samps, options) {
   }
 
   var numBins = 100;
+  var binWidth = (max - min) / numBins;
 
   var results = [];
 
   for (var i = 0; i <= numBins; i++) {
-    var x = min + bandwidth * i;
+    var x = min + i * binWidth;
     var kernelSum = 0;
-    for (var j = 0; j < samps.length; j++) {
+    for (var j = 0, jj = samps.length; j < jj; j++) {
       kernelSum += kernel((x - samps[j]) / bandwidth);
     }
     results.push({item: x, density: kernelSum / (n * bandwidth)});
