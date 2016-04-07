@@ -117,8 +117,8 @@ Some examples:
 - `cccc`: trellis frequency table (TODO)
 - `cccr`: trellis scatter plot (TODO) / heat map (TODO)
 - `ccrr`: trellis scatter plot (TODO) / heat map (TODO)
-- `crrr`: trellis parallel coordinates plot
-- `ccrrr`: trellis parallel coordinates plot
+- `crrr`: trellis parallel coordinates plot (TODO)
+- `ccrrr`: trellis parallel coordinates plot (TODO)
 
 ## Developing
 
