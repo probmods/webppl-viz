@@ -8,14 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/erindb/webppl-viz.git"
+    "url": "https://github.com/probmods/webppl-viz.git"
   },
-  "author": "Erin Bennett",
+  "author": "Long Ouyang",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/erindb/webppl-viz/issues"
+    "url": "https://github.com/probmods/webppl-viz/issues"
   },
-  "homepage": "https://github.com/erindb/webppl-viz",
+  "homepage": "https://github.com/probmods/webppl-viz",
   "dependencies": {
     "babel-preset-react": "^6.5.0",
     "babelify": "^7.2.0",
