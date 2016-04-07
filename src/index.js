@@ -388,12 +388,28 @@ kindPrinter.rrr = function(types, support, scores) {
     return _.extend({prob: Math.exp(x[1])}, x[0])
   })
 
-  var overallScale = {name: "ord",
-                      type: "ordinal",
-                      points: true,
-                      range: "width",
-                      domain: fieldNames
-                  }
+  var overallScale = {
+    name: "ord",
+    type: "ordinal",
+    points: true,
+    range: "width",
+    domain: fieldNames
+  };
+
+  var probWidthScale = {
+    name: 'probWidth',
+    type: "linear",
+    range: [1,3],
+    domain: {data: 'values', field: 'prob'}
+  };
+
+  var probOpacityScale = {
+    name: 'probOpacity',
+    type: "log",
+    range: [0.2,1],
+    domain: {data: 'values', field: 'prob'}
+  };
+
   var individualScales = _.map(fieldNames,
                                function(name) {
                                  return {
@@ -418,26 +434,33 @@ kindPrinter.rrr = function(types, support, scores) {
   var vegaSpec = {
     data: [{name: 'values', values: data},
            {name: 'fields', values: fieldNames}],
-    scales: [overallScale].concat(individualScales),
+    scales: [overallScale,probWidthScale,probOpacityScale].concat(individualScales),
     axes: individualAxes,
-    "marks": [
+    marks: [
       {
-        "type": "group",
-        "from": {"data": "values"},
-        "marks": [
+        type: "group",
+        from: {data: "values"},
+        marks: [
           {
-            "type": "line",
-            "from": {"data": "fields"},
-            "properties": {
-              "enter": {
-                "x": {"scale": "ord", "field": "data"},
-                "y": {
-                  "scale": {"datum": "data"},
-                  "field": {"parent": {"datum": "data"}}
+            type: "line",
+            from: {data: "fields"},
+            properties: {
+              enter: {
+                x: {scale: "ord", field: "data"},
+                y: {
+                  scale: {datum: "data"},
+                  field: {parent: {datum: "data"}}
                 },
-                "stroke": {"value": "steelblue"},
-                "strokeWidth": {"value": 1},
-                "strokeOpacity": {"value": 0.3}
+                stroke: {value: "steelblue"},
+                strokeWidth: {
+                  field: {"parent": "prob"},
+                  scale: "probWidth"
+                },
+                strokeOpacity: {
+                  field: {"parent": "prob"},
+                  scale: "probOpacity"
+                }
+
               }
             }
           }
@@ -460,10 +483,7 @@ kindPrinter.rrr = function(types, support, scores) {
       }
     ]
   }
-
-  // TODO: render vega spec (not vega-lite)
   renderSpec(vegaSpec, "regularVega")
-
 }
 
 // automatically render an ERP
