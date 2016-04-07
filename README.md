@@ -122,14 +122,14 @@ Some examples of types for different supports:
 - `r`: density curve
 - `cc`: frequency table
 - `cr`: density curve, colors for different categorical groups
-- `rr`: scatter plot / heatmap (TODO)
+- `rr`: scatter plot (TODO: add heatmap)
 - `ccc`: trellis frequency table
 - `ccr`: trellis density plot, colors for different categorical groups
-- `crr`: trellis scatter plot / trellis heatmap (TODO)
+- `crr`: trellis scatter plot (TODO: add trellis heatmap)
 - `rrr+` (3 or more `r`'s): parallel coordinates plot
 - `cccc`: trellis frequency table (TODO)
-- `cccr`: trellis scatter plot (TODO) / heat map (TODO)
-- `ccrr`: trellis scatter plot (TODO) / heat map (TODO)
+- `cccr`: trellis scatter plot (TODO: add trellis heat map)
+- `ccrr`: trellis scatter plot / heat map (TODO)
 - `crrr`: trellis parallel coordinates plot (TODO)
 - `ccrrr`: trellis parallel coordinates plot (TODO)
 
