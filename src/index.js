@@ -378,6 +378,7 @@ kindPrinter.crr = function(types, support, scores) {
   renderSpec(vlSpec);
 }
 
+// TODO: also expose as viz.parcoords
 var parallelCoordinates = function(types, support, scores) {
   var fieldNames = _.keys(support[0]);
 
