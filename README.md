@@ -9,7 +9,7 @@ Dependencies:
 
 Usage: include webppl-viz.js and webppl-viz.css in your web page.
 
-## Manual functions
+## Standard functions
 
 ### Table
 
@@ -71,7 +71,7 @@ Options:
 
 TODO
 
-- `viz.heatMap(samples, [options])` 
+- `viz.heatMap(samples, [options])`
 - `viz.heatMap(erp, [options])`
 
 ### Parallel coordinates
@@ -92,9 +92,9 @@ Options:
 
 ### Data types
 
-We adopt the following nomenclature for data types: `c` stands for categorical variables and `r` for real variables (for now, ordinal variables count as categorical).
+First, a bit of notation: `c` stands for categorical variables and `r` for real variables (for now, ordinal variables count as categorical).
 
-Some examples:
+Some examples of types for different supports:
 
 - Every support element is an integer → type is `c`
 - Every support element is an integer → type is `r`
