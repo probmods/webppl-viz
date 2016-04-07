@@ -770,7 +770,7 @@ var kde = function(samps, kernel) {
   var min = _.min(samps);
   var max = _.max(samps);
 
-  var numBins = (max - min) / bandwidth;
+  var numBins = 100;
 
   var results = [];
 
