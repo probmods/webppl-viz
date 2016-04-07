@@ -74,11 +74,10 @@ Options:
 Function signatures:
 
 - `viz.density(samples, [options])`
-- `viz.density(erp, [options])` (TODO)
 
 Options:
 
-- `bounds` (defaults to bounds of the data). An array of bounds for density estimation
+- `bounds` (default: min and max of the supplied samples). An array of bounds for density estimation
 
 ### Heat map
 

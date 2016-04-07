@@ -836,6 +836,8 @@ function kde(samps, options) {
 
   // get optimal bandwidth
   // HT http://en.wikipedia.org/wiki/Kernel_density_estimation#Practical_estimation_of_the_bandwidth
+  // to support ERP as argument, we need to know the number of samples from an ERP
+  // (TODO: submit PR for webppl where Histogram.prototype.toERP preserves this info)
   var n = samps.length;
   var mean = samps.reduce(function(x,y) { return x + y })/n;
 
