@@ -1,11 +1,5 @@
 'use strict';
 
-/*
-
-  relies on vega-lite library
-
-  */
-
 var _ = require('underscore');
 var d3 = require('d3');
 var $ = require('jquery');
@@ -20,6 +14,30 @@ var md5 = require('md5');
 function isErp(x) {
   // TODO: take from dippl
   return x.support && x.score;
+}
+
+// convert a list of samples to an ERP
+function samplesToErp(xs) {
+  var n = xs.length;
+
+  var frequencies = _.countBy(xs, function(x) { return JSON.stringify(x) });
+  var support = _.keys(frequencies).map(function(x) { return JSON.parse(x) });
+  var probabilities = _.mapObject(frequencies, function(freq, key) { return freq/n });
+
+  var scorer = function(params, x) {
+    return Math.log(probabilities[JSON.stringify(x)]);
+  }
+
+  var sampler = function(params) {
+    return global.categorical(probabilities, support);
+  }
+
+  var ret = new global.ERP({
+    sample: sampler,
+    score: scorer,
+    support: function() { return support }
+  })
+  return ret;
 }
 
 // a data frame is an array of objects where
@@ -719,7 +737,11 @@ var bar = function(xs,ys, options) {
 }
 
 // currently hist operates on a collection of samples as well (e.g., from repeat)
-var hist = function(x) {
+var hist = function(x, options) {
+  options = _.defaults(options || {},
+                       {binWidth: 30})
+
+  // TODO: different behavior for categorical versus real
   if (isErp(x)) {
     var erp = x;
     var labels = erp.support();
@@ -728,6 +750,7 @@ var hist = function(x) {
     bar(labelsStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
   } else {
     var samples = x;
+    // NB: this doesn't work if 3 and '3' are keys
     var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
     var labels = _(frequencyDict).keys();
     var counts = _(frequencyDict).values();
@@ -836,8 +859,6 @@ function density(samples, options) {
 
   var densityEstimate = kde(samples, options);
 
-  debugger;
-
   var vlSpec = {
     "data": {values: densityEstimate},
     "mark": "area",
@@ -877,39 +898,47 @@ var line = function(xs, ys, options) {
 // visualize an erp as a table
 // TODO: if support items all have the same keys, expand them out
 // TODO, maybe one day: make this a fancy react widget with sortable columns
+// TODO: support a data frame structure as input
 // and smart hiding if there are too many rows
-var table = function(obj, options) {
+function table(obj, options) {
   //wpEditor is not present if not run in the browser
   if (typeof(wpEditor) === 'undefined') {
     console.log("viz.print: no wpEditor, not drawing");
     return;
   }
 
-  if (options === undefined)
-    options = {}
-  options = _.defaults(options, {log: false})
+  options = _.defaults(options || {},
+                       {log: false})
 
-  if (isErp(obj)) {
-    var support = obj.support();
-    var scores = support.map(function(state) { return obj.score(null,state) });
-
-    var sortedZipped = _.sortBy(_.zip(support, scores),function(z) {
-      return -z[1]
-    });
-
-    var tableString = '<table class="wviz-table"><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
-
-    sortedZipped.forEach(function(pair) {
-      var state = pair[0];
-      var score = pair[1];
-      tableString += "<tr><td>" + JSON.stringify(state) + "</td><td>" + (options.log ? score : Math.exp(score)) + "</td>"
-    })
-
-    var resultContainer = wpEditor.makeResultContainer();
-    resultContainer.innerHTML = tableString;
-
+  var erp;
+  if (_.isArray(obj)) {
+    erp = samplesToErp(obj)
+  } else if (isErp(obj)) {
+    erp = obj;
+  } else {
+    throw new Error('table takes an ERP or a list of samples as an argument')
   }
+
+  var support = erp.support();
+  var scores = support.map(function(state) { return erp.score(null,state) });
+
+  var sortedZipped = _.sortBy(_.zip(support, scores),function(z) {
+    return -z[1]
+  });
+
+  var tableString = '<table class="wviz-table"><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
+
+  sortedZipped.forEach(function(pair) {
+    var state = pair[0];
+    var score = pair[1];
+    tableString += "<tr><td>" + JSON.stringify(state) + "</td><td>" + (options.log ? score : Math.exp(score)) + "</td>"
+  })
+
+  var resultContainer = wpEditor.makeResultContainer();
+  resultContainer.innerHTML = tableString;
+
 }
+
 
 global.viz = {
   print: print,
