@@ -50,7 +50,12 @@ Options:
 
 Function signatures:
 
-- `viz.line(xs, ys)`
+- `viz.line(xs, ys, [options])`
+
+Options:
+
+- `xLabel` (default: x). x axis label.
+- `yLabel` (default: y). y axis label.
 
 ### Scatter plot
 

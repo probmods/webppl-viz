@@ -856,15 +856,18 @@ function density(samples, options) {
 }
 
 // TODO: show points
-var line = function(xs, ys) {
+var line = function(xs, ys, options) {
+  options = _.defaults(options || {},
+                       {xLabel: 'x',
+                        yLabel: 'y'})
   var data = _.zip(xs,ys).map(function(pair) { return {x: pair[0], y: pair[1]}})
 
   var vlSpec = {
     "data": {values: data},
     "mark": "line",
     "encoding": {
-      "x": {"field": "x", "type": "quantitative", axis: {title: 'x'}},
-      "y": {"field": "y","type": "quantitative", axis: {title: 'y'}}
+      "x": {"field": "x", "type": "quantitative", axis: {title: options.xLabel}},
+      "y": {"field": "y","type": "quantitative", axis: {title: options.yLabel}}
     }
   };
 
