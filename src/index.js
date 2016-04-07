@@ -705,8 +705,7 @@ var bar = function(xs,ys, opts) {
   renderSpec(vlSpec);
 }
 
-// currently hist operates on a collection of samples as well
-// (e.g., from repeat)
+// currently hist operates on a collection of samples as well (e.g., from repeat)
 var hist = function(x) {
   if (isErp(x)) {
     var erp = x;
@@ -745,10 +744,9 @@ var _scatter = function(xs, ys, opts) {
   renderSpec(vlSpec);
 }
 
-// TODO: density visualizations can be misleading at the bounds
 // input: a list of samples and, optionally, a kernel function
-// output: a list of estimated densities (range is min to max and number
-// of bins is (max-min) / (1.06 * s * n^(-.02))
+// output: a list of estimated densities (range is min to max and number of bins is 100)
+// TODO: make numBins and bandwidth options (with visible vega knobs?)
 function kde(samps, options) {
   options = _.defaults(options || {},
                        {bounds: 'auto',
