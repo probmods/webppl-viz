@@ -378,11 +378,8 @@ kindPrinter.crr = function(types, support, scores) {
   renderSpec(vlSpec);
 }
 
-kindPrinter.rrr = function(types, support, scores) {
+var parallelCoordinates = function(types, support, scores) {
   var fieldNames = _.keys(support[0]);
-  var field1Name = fieldNames[0];
-  var field2Name = fieldNames[1];
-  var field3Name = fieldNames[2];
 
   var data = _.zip(support, scores).map(function(x) {
     return _.extend({prob: Math.exp(x[1])}, x[0])
@@ -564,12 +561,15 @@ var vegaPrint = function(obj) {
       .sort()
       .join('');
 
-  // TODO: switch to warning rather than error
-  // (and maybe use wpEditor.put to get data)
-  if (_.has(kindPrinter, dfKind)) {
+  // HACK: use parallel coords for rn where n >= 3
+  if (dfKind.indexOf('c') == -1 && dfKind.length >= 3) {
+    parallelCoordinates(columnTypesDict, supportStringified, scores);
+  } else if (_.has(kindPrinter, dfKind)) {
     // NB: passes in supportStringified, not support
     kindPrinter[dfKind](columnTypesDict, supportStringified, scores);
   } else {
+    // TODO: switch to warning rather than error
+    // (and maybe use wpEditor.put to store the data)
     console.log(dfKind)
     throw new Error('viz.print() doesn\'t know how to render objects of kind ' + dfKind);
   }
