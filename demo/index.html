@@ -55,6 +55,9 @@
 
   <div class="col" style="float: left">
     <h1>new (vega)</h1>
+    scratch pad:
+    <pre id="testing"><code></code></pre>
+
     primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
 viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))
@@ -213,8 +216,20 @@ viz.print(discrete_erp);
 
 </body>
 <script>
-var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
-preEls.map(function(el) { wpEditor.setup(el, {language: 'webppl'}); });
+ $("#testing code").text(localStorage.getItem('testing'));
+
+ var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
+ preEls.map(function(el) {
+     var comp = wpEditor.setup(el, {language: 'webppl'});
+     if (el.id == 'testing') {
+         testingComp = comp
+     } });
+
+ window.onbeforeunload = function() {
+     // hack
+     localStorage.setItem('testing', testingComp.state.code)
+ }
+
 </script>
 <script src="webppl.js" defer></script>
 

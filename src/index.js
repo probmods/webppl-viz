@@ -701,11 +701,12 @@ function renderSpec(spec, regularVega) {
 // bar([{<key1>: ..., <key2>: ...])
 // and we map key1 to x, key2 to y
 //.. i wish javascript had types and multiple dispatch
-var bar = function(xs,ys, options) {
+function bar(xs,ys, options) {
   options = _.defaults(options || {},
                        {xLabel: 'x',
                         yLabel: 'y',
-                        horizontal: false
+                        horizontal: false,
+                        xType: 'nominal'
                        });
 
   var data = _.zip(xs,ys).map(function(pair) {
@@ -719,7 +720,7 @@ var bar = function(xs,ys, options) {
       "mark": "bar",
       encoding: {
         x: {"type": "quantitative", "field": "y", axis: {title: options.xLabel}},
-        y: {"type": "nominal", "field": "x", axis: {title: options.yLabel}}
+        y: {"type": options.xType, "field": "x", axis: {title: options.yLabel}}
       }
     };
   } else {
@@ -727,7 +728,7 @@ var bar = function(xs,ys, options) {
       "data": {"values": data},
       "mark": "bar",
       encoding: {
-        x: {"type": "nominal", "field": "x", axis: {title: options.xLabel}},
+        x: {"type": options.xType, "field": "x", axis: {title: options.xLabel}},
         y: {"type": "quantitative", "field": "y", axis: {title: options.yLabel}}
       }
     }
@@ -737,25 +738,59 @@ var bar = function(xs,ys, options) {
 }
 
 // currently hist operates on a collection of samples as well (e.g., from repeat)
-var hist = function(x, options) {
+function  hist(obj, options) {
   options = _.defaults(options || {},
-                       {binWidth: 30})
+                       {numBins: 30})
 
-  // TODO: different behavior for categorical versus real
-  if (isErp(x)) {
-    var erp = x;
-    var labels = erp.support();
-    var labelsStringified = labels.map(function(x) { return JSON.stringify(x) })
-    var probs = labels.map(function(x) { return Math.exp(erp.score(null, x)) });
-    bar(labelsStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
+  var erp;
+  if (_.isArray(obj)) {
+    erp = samplesToErp(obj)
+  } else if (isErp(obj)) {
+    erp = obj;
   } else {
-    var samples = x;
-    // NB: this doesn't work if 3 and '3' are keys
-    var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
-    var labels = _(frequencyDict).keys();
-    var counts = _(frequencyDict).values();
-    bar(labels, counts, {xLabel: 'Value', yLabel: 'Frequency'})
+    throw new Error('hist takes an ERP or a list of samples as an argument')
   }
+
+  var support = erp.support();
+  var probs = support.map(function(x) { return Math.exp(erp.score(null, x)) });
+  if (typeof support[0] == 'number') {
+    var min = _.min(support),
+        max = _.max(support),
+        binWidth = (max-min)/options.numBins;
+
+    // OPTIMIZE
+    var bins = [];
+    for(var i = 0; i < options.numBins; i++) {
+      var currentBin = {
+        lower: min + i * binWidth,
+        upper: min + (i + 1) * binWidth
+      };
+      currentBin.entries = _.filter(support, function(x) { return x >= currentBin.lower && x < currentBin.upper })
+      bins.push(currentBin)
+    }
+
+    // make sure max point gets into histogram
+    bins[bins.length-1].upper += Number.EPSILON;
+
+    var binProbs = bins.map(function(bin) {
+      return util.sum(_.map(bin.entries, function(x) { return Math.exp(erp.score(null, x)) }));
+    })
+
+    // TODO: do ticks based on bin boundaries, rather than showing bin means, as i've done here
+    var binLabels = _.map(bins, function(bin) {
+      return ((bin.upper + bin.lower)/2).toExponential(2)
+    })
+
+    bar(binLabels, binProbs, {xLabel: 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
+
+    return;
+  }
+
+  var supportStringified = support.map(stringifyIfObject)
+
+
+  bar(supportStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
+
 };
 
 // TODO: rename to scatter after porting erin's vizPrint code to vega

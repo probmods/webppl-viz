@@ -45,7 +45,7 @@ Function signatures:
 
 Options:
 
-- `binwidth` (defaults to 0). TODO.
+- `numBins` (defaults to 30). For real-valued data, how many bins to aggregate data into.
 
 ### Line chart
 
