@@ -31,7 +31,9 @@ Function signatures:
 
 Options:
 
-- `horizontal` (default = false) (TODO). Produce a horizontal bar chart rather than vertical
+- `horizontal` (default: false). Draw a horizontal bar chart rather than vertical one.
+- `xLabel` (default: x). x axis label.
+- `yLabel` (default: x). x axis label.
 
 ### Histogram
 

@@ -683,24 +683,37 @@ function renderSpec(spec, regularVega) {
 // bar([{<key1>: ..., <key2>: ...])
 // and we map key1 to x, key2 to y
 //.. i wish javascript had types and multiple dispatch
-var bar = function(xs,ys, opts) {
-  opts = _.defaults(opts || {},
-                    {xLabel: 'x',
-                     yLabel: 'y'});
+var bar = function(xs,ys, options) {
+  options = _.defaults(options || {},
+                       {xLabel: 'x',
+                        yLabel: 'y',
+                        horizontal: false
+                       });
 
   var data = _.zip(xs,ys).map(function(pair) {
     return {x: pair[0], y: pair[1]}
   })
 
-  var vlSpec = {
-    "data": {"values": data},
-    "mark": "bar",
-    encoding: {
-      x: {"type": "nominal", "field": "x", axis: {title: opts.xLabel}},
-      y: {"type": "quantitative", "field": "y", axis: {title: opts.yLabel}}
-    },
-    config: {numberFormat: "f"}
-  };
+  var vlSpec;
+  if (options.horizontal) {
+    vlSpec = {
+      "data": {"values": data},
+      "mark": "bar",
+      encoding: {
+        x: {"type": "quantitative", "field": "y", axis: {title: options.xLabel}},
+        y: {"type": "nominal", "field": "x", axis: {title: options.yLabel}}
+      }
+    };
+  } else {
+    vlSpec = {
+      "data": {"values": data},
+      "mark": "bar",
+      encoding: {
+        x: {"type": "nominal", "field": "x", axis: {title: options.xLabel}},
+        y: {"type": "quantitative", "field": "y", axis: {title: options.yLabel}}
+      }
+    }
+  }
 
   renderSpec(vlSpec);
 }
