@@ -898,7 +898,7 @@ function density(samples, options) {
 
   var vlSpec = {
     "data": {values: densityEstimate},
-    "mark": "area",
+    "mark": "line",
     "encoding": {
       "x": {"field": "item",
             "type": "quantitative",
