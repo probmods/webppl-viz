@@ -74,6 +74,7 @@ Options:
 Function signatures:
 
 - `viz.density(samples, [options])`
+- `viz.density(erp, [options])` (TODO: save total_count in webppl Histogram.toERP)
 
 Options:
 
@@ -81,10 +82,8 @@ Options:
 
 ### Heat map
 
-TODO
-
 - `viz.heatMap(samples, [options])`
-- `viz.heatMap(erp, [options])`
+- `viz.heatMap(erp, [options])` (TODO: save total_count in webppl Histogram.toERP)
 
 ### Parallel coordinates
 

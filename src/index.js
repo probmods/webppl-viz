@@ -872,10 +872,212 @@ function kde(samps, options) {
   return results;
 }
 
-var kde2d = function(samps) {
-  // mimics kde2d from the MASS package in R
-  // uses axis-aligned gaussian kernel
+// TODO: figure out why heat maps are so large
+// samples can be arrays o
+var heatMap = function(samples) {
 
+  if (isErp(samples)) {
+    throw new Error('erp arguments to heat map not yet supported')
+  }
+
+  var x, y;
+  if (_.isArray(samples[0])) {
+    x = _.pluck(samples,'0')
+    y = _.pluck(samples,'1')
+  } else if (_.isObject(samples[0])) {
+    var keys = _.keys(samples[0]);
+    x = _.pluck(samples, keys[0])
+    y = _.pluck(samples, keys[1]);
+  }
+
+  var densityEstimate = kde2d(x,y);
+
+  var formatter = d3.format('.1e');
+  _.forEach(densityEstimate,
+            function(row) {
+              row.x = formatter(row.x);
+              row.y = formatter(row.y);
+            })
+
+  var spec = {
+    data: [{'name': 'csv', values: densityEstimate}],
+    "scales": [
+      {
+        "name": "x",
+        "type": "ordinal",
+        "domain": {"data": "csv","field": "x"},
+        "range": "width"
+      },
+      {
+        "name": "y",
+        "type": "ordinal",
+        "domain": {"data": "csv","field": "y"},
+        "range": "height",
+        "reverse": true
+      },
+      {
+        "name": "c",
+        "type": "linear",
+        "domain": {"data": "csv","field": "density"},
+        "range": ["#ffffff", "#313695"]
+      }
+    ],
+    "axes": [{"type": "x","scale": "x", format: '.1e'},
+             {"type": "y","scale": "y", format: '.1e'}],
+    "marks": [
+      {
+        "type": "rect",
+        "from": {"data": "csv"},
+        "properties": {
+          "enter": {
+            "x": {"scale": "x","field": "x"},
+            "width": {"scale": "x", "band": true},
+            "y": {"scale": "y","field": "y"},
+            "height": {"scale": "y", "band": true},
+            "fill": {"scale": "c", "field": "density"},
+            "stroke": {"value": "#dddddd"},
+            "strokeWidth": {"value": "0.2"}
+          }
+        }
+      }
+    ]
+  };
+
+  renderSpec(spec, 'regularVega')
+}
+
+var kde2d = function(x,y) {
+  // mimics kde2d from the MASS package in R, which uses axis-aligned gaussian kernel
+
+  function dnorm(x) {
+    var mu = 0, sigma = 1;
+
+    return 1/(sigma * Math.sqrt(2*Math.PI)) * Math.exp(-Math.pow(x-mu,2) / (2 * sigma * sigma))
+  }
+
+  // HT rosetta code
+  function Matrix(ary) {
+    this.mtx = ary
+    this.height = ary.length;
+    this.width = ary[0].length;
+  }
+
+  // HT rosetta code
+  // returns a new matrix
+  Matrix.prototype.mult = function(other) {
+    if (this.width != other.height) {
+      throw new Error("Matrix multiply: incompatible sizes (" + this.width + "," + this.height + "), (" + other.width + "," + other.height + ")" );
+    }
+
+    var result = [];
+    for (var i = 0; i < this.height; i++) {
+      result[i] = [];
+      for (var j = 0; j < other.width; j++) {
+        var sum = 0;
+        for (var k = 0; k < this.width; k++) {
+          sum += this.mtx[i][k] * other.mtx[k][j];
+        }
+        result[i][j] = sum;
+      }
+    }
+    return new Matrix(result);
+  }
+
+  Matrix.prototype.transpose = function() {
+    var transposed = [];
+    for (var i = 0; i < this.width; i++) {
+      transposed[i] = [];
+      for (var j = 0; j < this.height; j++) {
+        transposed[i][j] = this.mtx[j][i];
+      }
+    }
+    return new Matrix(transposed);
+  }
+
+  Matrix.prototype.map = function(f) {
+    var res = [];
+    for (var i = 0; i < this.height; i++) {
+      var row = [];
+      for (var j = 0; j < this.width; j++) {
+        row.push( f(this.mtx[i][j]) );
+      }
+      res.push(row);
+    }
+    return new Matrix(res);
+  }
+
+
+  var nx = x.length;
+  var n1 = 25;
+  var n2 = 25;
+
+  var minX = _.min(x);
+  var maxX = _.max(x);
+
+  var minY = _.min(y);
+  var maxY = _.max(y);
+
+  var stepWidthX = (maxX - minX)/(n1-1);
+  var stepWidthY = (maxY - minY)/(n2-1);
+
+  var gx = _.range(n1).map(function(k) { return minX + k * stepWidthX });
+  var gy = _.range(n2).map(function(k) { return minY + k * stepWidthY });
+
+  // todo
+
+  var mean = function(v) {
+    return util.sum(v) / v.length;
+  }
+
+  var variance = function(v) {
+    var m = mean(v);
+    return util.sum(_.map(v, function(vi) { return (vi-m) * (vi-m) }))/(v.length - 1);
+  }
+
+  var getBandwidth = function(v) {
+    var scale = d3.scale.quantile().domain(v).range(d3.range(4));
+    var r = [scale.invertExtent(0)[1], scale.invertExtent(2)[1]];
+    var h = (r[1] - r[0])/1.34;
+    return 4 * 1.06 * Math.min(Math.sqrt(variance(v)), h) * Math.pow(v.length, -0.2)
+  }
+
+  var h = [getBandwidth(x)/4, getBandwidth(y)/4]
+
+  // compute limits for 25 percentile through 75
+
+  var ax = _.map(gx,
+                 function(_gx) {
+                   return _.map(x, function(_x) {
+                     return (_gx - _x)/h[0];
+                   })
+                 }
+                )
+
+  var ay = _.map(gy,
+                 function(_gy) {
+                   return _.map(y, function(_y) {
+                     return (_gy - _y)/h[1];
+                   })
+                 }
+                )
+
+  var mx = new Matrix(ax).map(dnorm);
+  var my = new Matrix(ay).map(dnorm);
+
+  var z = mx.mult(my.transpose()).mtx.map(function(row) {
+    return row.map(function(col) {
+      return col/(nx * h[0] * h[1])
+    })
+  })
+
+  var ret = [];
+  for(var ix = 0; ix < n1; ix++) {
+    for(var iy = 0; iy < n2; iy++) {
+      ret.push({x: gx[ix], y: gy[iy], density: z[ix][iy]})
+    }
+  }
+
+  return ret;
 
 }
 
@@ -985,5 +1187,6 @@ global.viz = {
   scatter: _scatter,
   density: density,
   line: line,
-  table: table
+  table: table,
+  heatMap: heatMap
 }
