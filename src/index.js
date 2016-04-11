@@ -4,6 +4,8 @@ var _ = require('underscore');
 var d3 = require('d3');
 var $ = require('jquery');
 
+global.d3 = d3;
+
 var vl = require('vega-lite');
 var vg = require('vega');
 
