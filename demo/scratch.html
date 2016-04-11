@@ -46,6 +46,13 @@
      pre {
          font-size: 12px;
      }
+
+     code.emph {
+         background-color: #dddddd;
+         border: 1px solid #bbbbbb;
+         border-radius: 2px;
+         padding: 0 0.3em;
+     }
     </style>
   </head>
   <body>
@@ -53,12 +60,19 @@
       <h2>model</h2>
       <pre id="comp0"><code></code></pre>
 
-      <p></p>
+    </div>
+    <div class="col" style="position: fixed; left: 50%">
+      <h2>reminders</h2>
+      <ul>
+        <li>putting: <code class="emph">wpEditor.put([key], obj)</code>, getting: <code class="emph">wpEditor.get(key)</code></li>
+        <li><a href="https://github.com/probmods/webppl-viz/" target="_blank">viz docs</a></li>
+      </ul>
+
       <h2>scratch</h2>
       <pre id="comp1"><code></code></pre>
 
-    </div>
-    <div class="col" style="float: left">
+      <p></p>
+
       <h2>viz</h2>
       <pre id="comp2"><code></code></pre>
     </div>
