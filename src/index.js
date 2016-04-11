@@ -104,8 +104,6 @@ function isPseudoDataFrame(arr, strict /* default true*/) {
   return _.every(columnTypesOk);
 }
 
-var print = require('./old').print;
-
 var wait = function(ms,f) {
   setTimeout(f,ms);
 }
@@ -505,7 +503,7 @@ var parallelCoordinates = function(types, support, scores) {
 }
 
 // automatically render an ERP
-var vegaPrint = function(obj) {
+var auto = function(obj) {
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
     // some questions:
@@ -531,7 +529,7 @@ var vegaPrint = function(obj) {
   };
 
   if (!isErp(obj)) {
-    // TODO: write wpEditor.warn method, use it to inform user that vegaPrint only works on ERPs
+    // TODO: write wpEditor.warn method, use it to inform user that auto only works on ERPs
     // (though maybe this isn't necessary since we are using __print__ decorator in wp-editor?)
     return null;
   }
@@ -795,8 +793,7 @@ function  hist(obj, options) {
 
 };
 
-// TODO: rename to scatter after porting erin's vizPrint code to vega
-var _scatter = function(xs, ys, options) {
+var scatter = function(xs, ys, options) {
   options = _.defaults(options || {},
                        {xLabel: 'x',
                         yLabel: 'y'});
@@ -1182,11 +1179,11 @@ function table(obj, options) {
 
 
 global.viz = {
-  print: print,
-  vegaPrint: vegaPrint,
+  d3auto: require('./old').print,
+  auto: auto,
   bar: bar,
   hist: hist,
-  scatter: _scatter,
+  scatter: scatter,
   density: density,
   line: line,
   table: table,

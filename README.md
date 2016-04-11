@@ -93,9 +93,9 @@ TODO: expose this functionality to end users
 
 ## Automatic function
 
-There is currently only one automatic function: `viz.vegaPrint(erp, [options])`
+There is currently only one automatic function: `viz.auto(erp, [options])`
 
-`viz.vegaPrint` tries to automatically construct a suitable visualization based on the types of the items in the ERP support.
+`viz.auto` tries to automatically construct a suitable visualization based on the types of the items in the ERP support.
 
 Options:
 
