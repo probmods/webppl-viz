@@ -50,7 +50,39 @@
     </style>
   </head>
   <body>
-      <pre id="r230rj"><code></code></pre>
+      <pre id="r230rj"><code>var getParams = function(country, brand, version) {
+  if (brand == 'pepsi') {
+    if (version == 'diet') {
+      return [1,1]
+    } else {
+      return [2, 1]
+    }
+  } else {
+    // coke
+    if (country == 'mexico') {
+      return version == 'regular' ? [11,1] : [5,5]
+    } else {
+      return version == 'regular' ? [7,1] : [6,2]
+    }
+  }
+}
+
+util.seedRNG(4)
+
+viz.auto(MH(function() {
+  var country = uniformDraw(['usa','mexico','canada']);
+  var brand = uniformDraw(['coke','pepsi']);
+  var version = uniformDraw(['diet','regular']);
+
+  var params = getParams(country, brand, version);
+
+  return {
+    country: country,
+    version: version,
+    brand: brand,
+    tastiness: gaussian(params[0], params[1])
+  }
+}, 4000));</code></pre>
   </body>
   <script>
    $("#r230rj code").text(localStorage.getItem('r230rj'));
