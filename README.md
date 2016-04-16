@@ -57,6 +57,7 @@ Options:
 
 - `xLabel` (default: x). x axis label.
 - `yLabel` (default: y). y axis label.
+- `groupBy` (default: none). Grouping variable for different lines.
 
 ### Scatter plot
 
