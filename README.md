@@ -51,6 +51,7 @@ Options:
 
 Function signatures:
 
+- `viz.line(df, [options])`
 - `viz.line(xs, ys, [options])`
 
 Options:
