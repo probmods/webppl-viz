@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script src="editor.js"></script>
+    <script src="webppl-viz.js"></script>
+    <script src="jquery.js"></script>
+    <link rel="stylesheet" href="webppl-viz.css">
+    <link rel="stylesheet" href="editor.css">
+
+    <style>
+     pre {
+         border: 1px solid black;
+         border-radius: 2px;
+         margin: 0;
+         padding: 4px;
+     }
+
+     body {
+         min-width: 600px;
+         margin: 0 auto;
+         font-family: Menlo;
+         font-size: 12px;
+         margin: 2em
+     }
+
+     .col {
+         width: 550px;
+         margin: 12px
+     }
+
+     .wpedit .CodeMirror {
+         font-size: 12px;
+     }
+
+     h1 {
+         font-size: 20px
+     }
+
+     #intro code {
+         border: 1px solid #ddd;
+         border-radius: 2px;
+         background-color: #ddd;
+         padding: 0 3px;
+     }
+
+     pre {
+         font-size: 10px;
+     }
+    </style>
+  </head>
+  <body>
+    problem - high probability => huge points:
+    <pre><code>viz.d3auto(Enumerate(function(){return {
+"a": flip(.9) ? 0 : 1,
+"b": flip(.9) ? 0 : 1,
+"c": flip(.99) ? 0 : 1}}))</code></pre>
+
+    problem - joint visualization can be bad (nb: problematic for new code too):
+    <pre><code>viz.d3auto(ParticleFilter(function() {
+  return {
+    a: gaussian(0,1),
+    b: categorical([0.1,0.8,0.1],[1.1,2.1,3.1])
+  }
+}))</code></pre>
+
+    <pre><code>var continuous_erp_3d = ParticleFilter(function() {
+  return {
+    X: gaussian(0,1),
+    Y: gaussian(0,1),
+    Z: gaussian(0,1)
+  }
+}, 1000);
+viz.d3auto(continuous_erp_3d);</code></pre>
+
+    <pre><code>var discrete_erp_3d = Enumerate(function() {
+  return {
+    who: categorical([1, 1, 1, 1, 1, 1], ["Plum", "Peacock", "White", "Scarlet", "Mustard", "Green"]),
+    where: categorical([1, 3, 5, 2, 4], ["candlestick", "knife", "revolver", "rope", "poison"]),
+    with_what: categorical([1, 1, 1, 1, 1], ["dining", "kitchen", "hall", "conservatory", "library"])
+  }
+});
+viz.d3auto(discrete_erp_3d);</code></pre>
+
+    <pre><code>var discrete_erp_2d = Enumerate(function() {
+  return {
+    fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"]),
+    boolean: flip(0.7)
+  }
+});
+viz.d3auto(discrete_erp_2d);</code></pre>
+
+    <pre><code>var continuous_erp_2d = ParticleFilter(function() {
+  return {
+    X: gaussian(0, 1),
+    Y: gaussian(0, 1)
+  }
+}, 1000);
+viz.d3auto(continuous_erp_2d);</code></pre>
+
+    <pre><code>var continuous_erp = ParticleFilter(function() { return gaussian(0, 1); }, 1000);
+viz.d3auto(continuous_erp);</code></pre>
+
+    <pre><code>var discrete_erp = Enumerate(function() { return flip(0.9) ? "apple" : "orange"; });
+viz.d3auto(discrete_erp); </code></pre>
+
+  </body>
+  <script>
+   var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
+   preEls.map(function(el) {var comp = wpEditor.setup(el, {language: 'webppl'});});
+  </script>
+  <script src="webppl.js" defer></script>
+
+</html>
