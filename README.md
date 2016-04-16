@@ -28,13 +28,15 @@ Options:
 
 Function signatures:
 
+- `viz.bar(df, [options])`
 - `viz.bar(xs, ys, [options])`
 
 Options:
 
-- `horizontal` (default: false). Draw a horizontal bar chart rather than vertical one.
+- `horizontal` (default: false). Draw a horizontal bar chart rather than vertical one. (TODO)
 - `xLabel` (default: x). x axis label.
 - `yLabel` (default: y). y axis label.
+- `xType` (default: y). y axis label.
 
 ### Histogram
 

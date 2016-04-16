@@ -1,5 +1,3 @@
-'use strict';
-
 var _ = require('underscore');
 var d3 = require('d3');
 var $ = require('jquery');
@@ -44,6 +42,7 @@ function samplesToErp(xs) {
 
 // a data frame is an array of objects where
 // all objects have the same keys
+// TODO: do with underscore
 function isDataFrame(arr) {
   var first_keys = _.keys(arr[0]);
   if (first_keys.length > 0) {
@@ -872,45 +871,75 @@ function renderSpec(spec, regularVega) {
 
 }
 
-// TODO: maybe a better function signature is
-// bar([{<key1>: ..., <key2>: ...])
-// and we map key1 to x, key2 to y
-//.. i wish javascript had types and multiple dispatch
-function bar(xs,ys, options) {
+// TODO: groupBy defaults to the third key in df
+// TODO: clean up options stuff
+function barDfs(df, options) {
   options = _.defaults(options || {},
-                       {xLabel: 'x',
-                        yLabel: 'y',
-                        horizontal: false,
+                       {groupBy: false,
                         xType: 'nominal'
-                       });
+                       })
 
-  var data = _.zip(xs,ys).map(function(pair) {
-    return {x: pair[0], y: pair[1]}
-  })
+  var xName = _.keys(df[0])[0];
+  var yName = _.keys(df[0])[1];
 
-  var vlSpec;
-  if (options.horizontal) {
-    vlSpec = {
-      "data": {"values": data},
-      "mark": "bar",
-      encoding: {
-        x: {"type": "quantitative", "field": "y", axis: {title: options.xLabel}},
-        y: {"type": options.xType, "field": "x", axis: {title: options.yLabel}}
-      }
-    };
-  } else {
-    vlSpec = {
-      "data": {"values": data},
-      "mark": "bar",
-      encoding: {
-        x: {"type": options.xType, "field": "x", axis: {title: options.xLabel}},
-        y: {"type": "quantitative", "field": "y", axis: {title: options.yLabel}}
-      }
+  // TODO: assert that groupBy variable is actually in the df
+
+  var vlSpec = {
+    "data": {values: df},
+    "mark": "bar",
+    "encoding": {
+      "x": {"field": xName, "type": options.xType, axis: {title: options.xLabel || xName}},
+      "y": {"field": yName, "type": "quantitative", axis: {title: options.yLabel || yName}}
     }
+  };
+
+  if (options.groupBy) {
+
+    vlSpec.encoding.column = {
+      "field": xName, "type": "ordinal",
+      "scale": {"padding": 4},
+      "axis": {"orient": "bottom", "axisWidth": 1, "offset": -8}
+    }
+
+    vlSpec.encoding.x = {
+      "field": options.groupBy, "type": "ordinal",
+      "scale": {"bandSize": 6},
+      "axis": false
+    }
+
+    vlSpec.encoding.y.axis = {grid: false};
+
+    vlSpec.encoding.color = {
+      field: options.groupBy,
+      type: 'nominal',
+      scale: {range: "category10"}
+    }
+
+    vlSpec.config =  {"facet": {"cell": {"strokeWidth": 0}}}
   }
 
   renderSpec(vlSpec);
 }
+
+function barDispatch() {
+  var args = _.toArray(arguments);
+
+  if (isDataFrame(arguments[0])) {
+    return barDfs.apply(null,args)
+  } else {
+    var xs = args[0];
+    var ys = args[1];
+
+    var df = [];
+    for(var i = 0, ii = xs.length; i < ii; i++) {
+      df.push({x: xs[i], y: ys[i]})
+    }
+
+    return barDfs.apply(null,[df].concat(args.slice(2)));
+  }
+}
+
+
 
 // currently hist operates on a collection of samples as well (e.g., from repeat)
 function  hist(obj, options) {
@@ -956,15 +985,14 @@ function  hist(obj, options) {
       return ((bin.upper + bin.lower)/2).toExponential(2)
     })
 
-    bar(binLabels, binProbs, {xLabel: 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
+    barDispatch(binLabels, binProbs, {xLabel: 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
 
     return;
   }
 
   var supportStringified = support.map(stringifyIfObject)
 
-
-  bar(supportStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
+  barDispatch(supportStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
 
 };
 
@@ -1289,7 +1317,7 @@ function density(samples, options) {
   renderSpec(vlSpec);
 }
 
-var lineDfs = function(df, options) {
+function lineDfs(df, options) {
   options = _.defaults(options || {},
                        {groupBy: false})
 
@@ -1319,7 +1347,7 @@ var lineDfs = function(df, options) {
 }
 
 // TODO: show points
-var line = function(xs, ys, options) {
+function line(xs, ys, options) {
   options = _.defaults(options || {},
                        {xLabel: 'x',
                         yLabel: 'y'})
@@ -1335,6 +1363,17 @@ var line = function(xs, ys, options) {
   };
 
   renderSpec(vlSpec);
+}
+
+// mimic multiple dispatch
+var lineDispatch = function() {
+  if (isDataFrame(arguments[0])) {
+    return lineDfs.apply(null, arguments);
+  } else {
+    // TODO: convert x's and y's to dataframe, then use lineDfs
+
+    return line.apply(null, arguments)
+  }
 }
 
 // visualize an erp as a table
@@ -1385,12 +1424,11 @@ function table(obj, options) {
 global.viz = {
   d3auto: require('./old').print,
   auto: auto,
-  bar: bar,
+  bar: barDispatch,
   hist: hist,
   scatter: scatter,
   density: density,
-  //line: line,
-  line: lineDfs,
+  line: lineDispatch,
   table: table,
   heatMap: heatMap
 }
