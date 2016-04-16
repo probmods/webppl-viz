@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script src="editor.js"></script>
+    <script src="webppl-viz.js"></script>
+    <script src="jquery.js"></script>
+    <link rel="stylesheet" href="webppl-viz.css">
+    <link rel="stylesheet" href="editor.css">
+
+    <style>
+     pre {
+         border: 1px solid black;
+         border-radius: 2px;
+         margin: 0;
+         padding: 4px;
+     }
+
+     body {
+         min-width: 600px;
+         margin: 0 auto;
+         font-family: Menlo;
+         font-size: 12px;
+         padding: 1em
+     }
+
+     .col {
+         width: 550px;
+         margin: 10px
+     }
+
+     .wpedit .CodeMirror {
+         font-size: 12px;
+     }
+
+     h1 {
+         font-size: 20px
+     }
+
+     #intro code {
+         border: 1px solid #ddd;
+         border-radius: 2px;
+         background-color: #ddd;
+         padding: 0 3px;
+     }
+
+     pre {
+         font-size: 12px;
+     }
+    </style>
+  </head>
+  <body>
+      <pre id="r230rj"><code></code></pre>
+  </body>
+  <script>
+   $("#r230rj code").text(localStorage.getItem('r230rj'));
+
+   var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
+   preEls.map(function(el) {
+       var comp = wpEditor.setup(el, {language: 'webppl'});
+       if (el.id == 'r230rj') {
+           testingComp = comp
+       } });
+
+   window.onbeforeunload = function() {
+       // hack
+       localStorage.setItem('r230rj', testingComp.state.code)
+   }
+
+  </script>
+  <script src="webppl.js" defer></script>
+
+</html>
