@@ -126,7 +126,7 @@ kindPrinter.c = function(types, support, scores) {
   var values = _.pluck(support, fieldName);
   var probs = scores.map(function(score) { return Math.exp(score) });
 
-  bar(values, probs, {xLabel: fieldName, yLabel: 'frequency'})
+  barDispatch(values, probs, {xLabel: fieldName, yLabel: 'frequency'})
 }
 
 kindPrinter.r = function(types, support, scores) {
