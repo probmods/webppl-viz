@@ -1074,8 +1074,8 @@ function kde(samps, options) {
   return results;
 }
 
-// TODO: figure out why heat maps are so large
-// samples can be arrays o
+// TODO: figure out more idiomatic way of reducing empty space around heatmap
+// TODO: add numBins option, log option
 var heatMap = function(samples) {
 
   if (isErp(samples)) {
@@ -1103,6 +1103,7 @@ var heatMap = function(samples) {
 
   var spec = {
     data: [{'name': 'csv', values: densityEstimate}],
+    "padding": {"left": 50, "top": 10, "right": 150, "bottom": 50},
     "scales": [
       {
         "name": "x",
@@ -1121,11 +1122,18 @@ var heatMap = function(samples) {
         "name": "c",
         "type": "linear",
         "domain": {"data": "csv","field": "density"},
-        "range": ["#ffffff", "#313695"]
+        "range": ["#ffffff","#313695"]
       }
     ],
-    "axes": [{"type": "x","scale": "x", format: '.1e'},
-             {"type": "y","scale": "y", format: '.1e'}],
+    "axes": [
+      {"type": "x","scale": "x","format": ".1e",
+       "properties": {"labels": {"angle": {"value": 45}, "align": {"value": "left"}}}
+
+      },
+      {"type": "y","scale": "y","format": ".1e"
+
+      }
+    ],
     "marks": [
       {
         "type": "rect",
@@ -1133,16 +1141,18 @@ var heatMap = function(samples) {
         "properties": {
           "enter": {
             "x": {"scale": "x","field": "x"},
-            "width": {"scale": "x", "band": true},
+            "width": {"scale": "x","band": true},
             "y": {"scale": "y","field": "y"},
-            "height": {"scale": "y", "band": true},
-            "fill": {"scale": "c", "field": "density"},
+            "height": {"scale": "y","band": true},
+            "fill": {"scale": "c","field": "density"},
             "stroke": {"value": "#dddddd"},
             "strokeWidth": {"value": "0.2"}
           }
         }
       }
-    ]
+    ],
+    "legends": [{"fill": "c", "values": [0, _.max(_.pluck(densityEstimate, 'density'))]}],
+    "config": {"numberFormat": ".1e"}
   };
 
   renderSpec(spec, 'regularVega')
