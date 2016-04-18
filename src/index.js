@@ -11,6 +11,10 @@ var React = require('react');
 var ReactDOM = require('react-dom');
 var md5 = require('md5');
 
+function runningInBrowser() {
+  return (typeof window === 'object')
+}
+
 function isErp(x) {
   // TODO: take from dippl
   return x.support && x.score;
@@ -890,31 +894,48 @@ function renderSpec(spec, regularVega) {
 
   var vgSpec = regularVega ? spec : vl.compile(spec).spec;
 
-  var resultContainer = wpEditor.makeResultContainer();
 
-  var r = React.createElement(GraphComponent, {spec: vgSpec});
+  var resultContainer;
 
-  // different possible architectures:
-  // - render before making React component, call update(), and pass result as prop
-  // - React component takes vega spec (not vega-lite spec) as prop and calls update() itself
-  //
-  // considerations:
-  // - might want to visualize streamed data that comes from inference callback
-  // - might want to support interaction like brushing, linking (it's not clear to me how orthogonal Reactive Vega is to React)
-  // - if structure is the same... show animation interpolating between previous result and current?
-  ReactDOM.render(r, resultContainer, function() {
-    var comp = this;
-    var node = this.refs.content;
-    $(node).text('   rendering...');
+  if (runningInBrowser()) {
+    if (wpEditor && wpEditor.makeResultContainer) {
+      resultContainer = wpEditor.makeResultContainer()
 
+      var r = React.createElement(GraphComponent, {spec: vgSpec});
+
+      // different possible architectures:
+      // - render before making React component, call update(), and pass result as prop
+      // - React component takes vega spec (not vega-lite spec) as prop and calls update() itself
+      //
+      // considerations:
+      // - might want to visualize streamed data that comes from inference callback
+      // - might want to support interaction like brushing, linking (it's not clear to me how orthogonal Reactive Vega is to React)
+      // - if structure is the same... show animation interpolating between previous result and current?
+      ReactDOM.render(r, resultContainer, function() {
+        var comp = this;
+        var node = this.refs.content;
+        $(node).text('   rendering...');
+
+        vg.parse.spec(vgSpec,
+                      function(error, chart) {
+                        $(node).empty();
+
+                        comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
+                      });
+
+      })
+
+    } else {
+      // TODO: if running in browser but editor isn't present, append graphic to body
+    }
+  } else {
     vg.parse.spec(vgSpec,
                   function(error, chart) {
-                    $(node).empty();
-
-                    comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
+                    var view = chart({renderer: 'svg'}).update();
+                    console.log(view.svg())
                   });
 
-  })
+  }
 
 }
 
@@ -972,7 +993,7 @@ function barDispatch() {
   var args = _.toArray(arguments);
 
   if (isDataFrame(arguments[0])) {
-    return barDfs.apply(null,args)
+    barDfs.apply(null,args)
   } else {
     var xs = args[0];
     var ys = args[1];
@@ -982,11 +1003,9 @@ function barDispatch() {
       df.push({x: xs[i], y: ys[i]})
     }
 
-    return barDfs.apply(null,[df].concat(args.slice(2)));
+    barDfs.apply(null,[df].concat(args.slice(2)));
   }
 }
-
-
 
 // currently hist operates on a collection of samples as well (e.g., from repeat)
 function  hist(obj, options) {
