@@ -803,30 +803,77 @@ var GraphComponent = React.createClass({
 
     // NB: download doesn't work perfectly in safari (it just spawns the picture in a new tab)
     // but that's how it works for the vega online editor too, so leave it here for now
-    return (<div className='graphComponent'>
-            <div ref='actions' className='actions'>
-            <button ref='wrench' className="settings" onClick={this.toggleSettings}></button>
-            <ul>
-            <li><a href={graphUrl} download={graphName} target="_blank">download graph</a></li>
-            <li><a href={dataUrl} download={dataName} target="_blank">download data</a></li>
-            <li><a href={vegaUrl} download={vegaName} target="_blank">download vega</a></li>
-            <li onClick={this.notYetImplemented}>resize</li>
-            </ul>
-            </div>
-            <div ref='content' className='content'></div>
-            <div className='clearboth'></div>
-            </div>)
+
+    // JSX is a complication so don't use it here.. use babel repl to get pure js
+    /*
+    (<div className='graphComponent'>
+     <div ref='actions' className='actions'>
+     <button ref='wrench' className="settings" onClick={this.toggleSettings}></button>
+     <ul>
+     <li><a href={graphUrl} download={graphName} target="_blank">download graph</a></li>
+     <li><a href={dataUrl} download={dataName} target="_blank">download data</a></li>
+     <li><a href={vegaUrl} download={vegaName} target="_blank">download vega</a></li>
+     <li onClick={this.notYetImplemented}>resize</li>
+     </ul>
+     </div>
+     <div ref='content' className='content'></div>
+     <div className='clearboth'></div>
+     </div>)
+    */
+
+
+    return React.createElement(
+      'div',
+      { className: 'graphComponent' },
+      React.createElement(
+        'div',
+        { ref: 'actions', className: 'actions' },
+        React.createElement('button', { ref: 'wrench', className: 'settings', onClick: this.toggleSettings }),
+        React.createElement(
+          'ul',
+          null,
+          React.createElement(
+            'li',
+            null,
+            React.createElement(
+              'a',
+              { href: graphUrl, download: graphName, target: '_blank' },
+              'download graph'
+            )
+          ),
+          React.createElement(
+            'li',
+            null,
+            React.createElement(
+              'a',
+              { href: dataUrl, download: dataName, target: '_blank' },
+              'download data'
+            )
+          ),
+          React.createElement(
+            'li',
+            null,
+            React.createElement(
+              'a',
+              { href: vegaUrl, download: vegaName, target: '_blank' },
+              'download vega'
+            )
+          ),
+          React.createElement(
+            'li',
+            { onClick: this.notYetImplemented },
+            'resize'
+          )
+        )
+      ),
+      React.createElement('div', { ref: 'content', className: 'content' }),
+      React.createElement('div', { className: 'clearboth' })
+    );
   }
 })
 
-// parse a vega-lite description and render it
+// parse a vega-lite or regular vega description and render it
 function renderSpec(spec, regularVega) {
-  //wpEditor is not present if not run in the browser
-  if (typeof(wpEditor) === 'undefined') {
-    console.log("viz.print: no wpEditor, not drawing");
-    return;
-  }
-
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
   // data can be large)
   if (!_.has(spec, 'config')) {
