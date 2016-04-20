@@ -1,1 +1,0 @@
-/Users/long/wp-editor/compiled/editor.js
