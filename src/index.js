@@ -932,7 +932,11 @@ function renderSpec(spec, regularVega) {
     vg.parse.spec(vgSpec,
                   function(error, chart) {
                     var view = chart({renderer: 'svg'}).update();
-                    console.log(view.svg())
+                    var svgText = view.svg();
+                    var hash = md5(svgText).substring(0,7);
+
+                    require('fs').writeFileSync(hash + '.svg', svgText);
+                    console.log("Rendered to " + hash + ".svg");
                   });
 
   }
