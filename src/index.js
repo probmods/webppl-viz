@@ -113,7 +113,7 @@ var wait = function(ms,f) {
 
 // i think i need this for proper axis labels when states are objects
 // but you don't want this turning numbers into strings either
-var stringifyIfObject = function(x) {
+function stringifyIfObject(x) {
   if (typeof x == 'object') {
     return JSON.stringify(x)
   } else {
@@ -267,7 +267,6 @@ kindPrinter.rr = function(types, support, scores) {
   renderSpec(vlSpec);
 }
 
-
 // TODO: find the field with the smallest number of values and use that for rows
 // TODO: rewrite once vega-lite can support small multiples of heatmaps (https://github.com/vega/vega-lite/issues/699)
 kindPrinter.ccc = function(types, support, scores) {
@@ -305,7 +304,6 @@ kindPrinter.ccc = function(types, support, scores) {
 
   // todo
 }
-
 
 kindPrinter.ccr = function(types, support, scores) {
   var typesExpanded = _.map(types, function(v,k) {
@@ -385,7 +383,6 @@ kindPrinter.ccr = function(types, support, scores) {
   //renderArray([vlSpec1, vlSpec2])
 
 }
-
 
 // HT http://codereview.stackexchange.com/a/59621
 function perms(data) {
@@ -482,7 +479,6 @@ kindPrinter.cccr = function(types, support, scores) {
 
 }
 
-
 kindPrinter.crr = function(types, support, scores) {
   var typesExpanded = _.map(types, function(v,k) {
     return {name: k,
@@ -516,7 +512,7 @@ kindPrinter.crr = function(types, support, scores) {
 }
 
 // TODO: also expose as viz.parcoords
-var parallelCoordinates = function(types, support, scores) {
+function parallelCoordinates(types, support, scores) {
   var fieldNames = _.keys(support[0]);
 
   var data = _.zip(support, scores).map(function(x) {
@@ -622,7 +618,7 @@ var parallelCoordinates = function(types, support, scores) {
 }
 
 // automatically render an ERP
-var auto = function(obj) {
+function auto(obj) {
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
     // some questions:
@@ -885,7 +881,7 @@ function renderSpec(spec, regularVega) {
 }
 
 // parse an array of vega-lite or regular vega descriptions and render them
-var renderArray = function(specs/*: array */, regularVega) {
+function renderArray(specs/*: array */, regularVega) {
   var nSpecsRemaining = specs.length;
 
   var resultContainer = wpEditor.makeResultContainer();
@@ -1173,7 +1169,7 @@ function kde(samps, options) {
 
 // TODO: figure out more idiomatic way of reducing empty space around heatmap
 // TODO: add numBins option, log option
-var heatMap = function(samples) {
+function heatMap(samples) {
 
   if (isErp(samples)) {
     throw new Error('erp arguments to heat map not yet supported')
@@ -1255,7 +1251,7 @@ var heatMap = function(samples) {
   renderSpec(spec, 'regularVega')
 }
 
-var kde2d = function(x,y) {
+function kde2d(x,y) {
   // mimics kde2d from the MASS package in R, which uses axis-aligned gaussian kernel
 
   function dnorm(x) {
@@ -1514,7 +1510,6 @@ function table(obj, options) {
   resultContainer.innerHTML = tableString;
 
 }
-
 
 global.viz = {
   d3auto: require('./old').print,
