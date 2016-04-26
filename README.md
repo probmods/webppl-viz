@@ -67,6 +67,7 @@ Options:
 Function signatures:
 
 - `viz.scatter(xs, ys, [options])`
+- `viz.scatter(df, [options])`
 
 Options:
 
