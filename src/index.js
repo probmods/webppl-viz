@@ -1114,7 +1114,6 @@ function scatterDispatch() {
   }
 }
 
-
 // input: a list of samples and, optionally, a kernel function
 // output: a list of estimated densities (range is min to max and number of bins is 100)
 // TODO: make numBins and bandwidth options (with visible vega knobs?)
@@ -1425,6 +1424,7 @@ function density(samples, options) {
   renderSpec(vlSpec);
 }
 
+// TODO: show points too
 function lineDfs(df, options) {
   options = _.defaults(options || {},
                        {groupBy: false})
@@ -1454,33 +1454,20 @@ function lineDfs(df, options) {
 
 }
 
-// TODO: show points
-function line(xs, ys, options) {
-  options = _.defaults(options || {},
-                       {xLabel: 'x',
-                        yLabel: 'y'})
-  var data = _.zip(xs,ys).map(function(pair) { return {x: pair[0], y: pair[1]}})
-
-  var vlSpec = {
-    "data": {values: data},
-    "mark": "line",
-    "encoding": {
-      "x": {"field": "x", "type": "quantitative", axis: {title: options.xLabel}},
-      "y": {"field": "y","type": "quantitative", axis: {title: options.yLabel}}
-    }
-  };
-
-  renderSpec(vlSpec);
-}
-
-// mimic multiple dispatch
-var lineDispatch = function() {
+function lineDispatch() {
+  var args = _.toArray(arguments);
   if (isDataFrame(arguments[0])) {
     return lineDfs.apply(null, arguments);
   } else {
-    // TODO: convert x's and y's to dataframe, then use lineDfs
+    var xs = args[0];
+    var ys = args[1];
 
-    return line.apply(null, arguments)
+    var df = [];
+    for(var i = 0, ii = xs.length; i < ii; i++) {
+        df.push({x: xs[i], y: ys[i]})
+    }
+
+    return lineDfs(df);
   }
 }
 
