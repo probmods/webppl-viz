@@ -1,0 +1,525 @@
+var workingVegaSpec = {
+  "width": 400,
+  "height": 200,
+  "padding": {"top": 10,"left": 30,"bottom": 30,"right": 10},
+  "data": [
+    {
+      "name": "df",
+      "values": [
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 3.652993262711397,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 3.541409819796617,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 3.9788982736436096,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 4.222221147019873,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "usa",
+          "brand": "coke",
+          "price": 4.222221147019873,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "coke",
+          "price": 4.222221147019873,
+          "prob": 0.03
+        },
+        {
+          "country": "canada",
+          "brand": "coke",
+          "price": 3.6102858649716207,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "coke",
+          "price": 3.6102858649716207,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 3.6102858649716207,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 1.8130139360787252,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 1.8130139360787252,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 1.0246177064297775,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 0.32348543117925077,
+          "prob": 0.05
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 0.32348543117925077,
+          "prob": 0.04000000000000001
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 0.32348543117925077,
+          "prob": 0.03
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 0.20418426487364538,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 3.022176508563337,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "canada",
+          "brand": "coke",
+          "price": 3.022176508563337,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 2.818573694550729,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.818573694550729,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "coke",
+          "price": 2.818573694550729,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "coke",
+          "price": 3.460582213451474,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 3.460582213451474,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 1.8686361457795708,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.752746186766795,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.752746186766795,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 0.7334072344211466,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 0.27677061652793067,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 0.27677061652793067,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 0.27677061652793067,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 1.5426848136559674,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 0.3555196103183058,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.013390712280666,
+          "prob": 0.04000000000000001
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.013390712280666,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 1.579726683615212,
+          "prob": 0.03
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 3.0350910251843186,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 1.7530456764860949,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.4790325504412145,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 2.4790325504412145,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 2.492067040828049,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.492067040828049,
+          "prob": 0.04000000000000001
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 0.5173753265905789,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 1.737470468097353,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 1.5716464636124476,
+          "prob": 0.03
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 1.5856180846956847,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 1.5856180846956847,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.2239884942399275,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "canada",
+          "brand": "pepsi",
+          "price": 2.2239884942399275,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.2239884942399275,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.9166604671809777,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.9166604671809777,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 2.9166604671809777,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 3.5255934067325043,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 3.527353840459581,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "coke",
+          "price": 3.8881487253271225,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "coke",
+          "price": 3.8881487253271225,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "usa",
+          "brand": "coke",
+          "price": 2.895937478122902,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "usa",
+          "brand": "pepsi",
+          "price": 2.895937478122902,
+          "prob": 0.020000000000000004
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.895937478122902,
+          "prob": 0.010000000000000002
+        },
+        {
+          "country": "mexico",
+          "brand": "pepsi",
+          "price": 2.721739424312895,
+          "prob": 0.020000000000000004
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "ordinal",
+      "range": "width",
+      "domain": {"data": "df","field": "country"}
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "range": "height",
+      "domain": {"data": "df","field": "prob"}
+    }
+  ],
+  "axes": [{"type": "x","scale": "x"},{"type": "y","scale": "y"}],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "df"},
+      "properties": {
+        "enter": {
+          "x": {"scale": "x", "field": "country"},
+          "y": {"scale": "y", "field": "prob"},
+          "size": {"value": 30},
+          "stroke": {"value": "#4682b4"},
+          "fill": {"value": "#99ccff"},
+          "opacity": {"value": 0.2}
+        }
+      }
+    }
+  ]
+};
+
+
+var marks = ['rect',
+             'symbol',
+             'path',
+             'arc',
+             'area',
+             'line',
+             'rule',
+             'text',
+             'group'
+            ];
+
+var sharedProperties = [
+  'x',
+  'x2',
+  'xc',
+  'width',
+  'y',
+  'y2',
+  'yc',
+  'height',
+  'opacity',
+  'fill',
+  'fillOpacity',
+  'stroke',
+  'strokeWidth'/*,
+  'strokeDash', // experimental
+  'strokeDashOffset' // experimental
+  */
+];
+
+var addProperties = {
+  rect: [],
+  symbol: ['size','shape'],
+  path: ['path'],// SVG path string
+  arc: ['innerRadius','outerRadius','startAngle','endAngle'],
+  area: ['orient','interpolate','tension'],
+  line: ['interpolate', 'tension']
+}
+
+var removeProperties = {
+  rect: [],
+  symbol: ['x2','xc','width','y2','yc','height']
+}
+
+var defaultValues = {
+  symbol: {
+    fill: "#99ccff",
+    stroke: "#4682b4"
+  }
+}
+
+var testMarks = ['symbol'];
+
+// TODO: plug in type inference from vega-lite
+var getType = function(v) {
+  var t = typeof v;
+  return {number: 'real',
+          string: 'nominal'
+         }[t]
+}
+
+var multiviz = function(df) {
+  var columnNames = _.keys(df[0]);
+  var columnTypes = map(getType, _.values(df[0]));
+
+  var model = function() {
+    var sampledMarks = [uniformDraw(testMarks)];
+
+    var addProps = _.union.apply(null,
+                                 map(function(m) { return addProperties[m] },
+                                     sampledMarks)
+                                );
+
+    var removeProps = _.union.apply(null,
+                                   map(function(m) { return removeProperties[m] },
+                                       sampledMarks)
+                                  );
+
+    var props = _.difference(_.union(sharedProperties, addProps),
+                             removeProps)
+
+    console.log(props)
+    process.exit()
+
+    var spec = {
+      data: [{name: 'df',
+              values: df}]
+    }
+    return 1
+
+  }
+
+  Enumerate(model, 5);
+
+
+}
+
+var erpToDf = function(erp) {
+  return map(function(state) {
+    return _.extend({}, state, {prob: Math.exp(erp.score(null,state))})
+  }, erp.support())
+
+}
+
+var post = MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi';
+  return {
+    country: uniformDraw(['usa','mexico','canada']),
+    brand: brand,
+    price: gaussian(brand == 'coke' ? 4 : 2, 1)
+  }
+}, 100);
+
+//multiviz()
+
+var df = erpToDf(post);
+
+
+
+multiviz(df)
