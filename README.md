@@ -138,14 +138,11 @@ Some examples of types for different supports:
 
 ## Developing
 
-Compiling:
-
 ```sh
-make demo/webppl-viz.js
-```
-
-Watchified compiling (incrementally rebuilds after source files have updated):
-
-```sh
-make watch
+grunt setup-demo       # make webppl and webppl-editor dependencies for demo
+grunt bundle           # compile js + minify, make css
+grunt browserify       # compiling js
+grunt uglify           # minify js
+grunt browserify-watch # watchified compile js
+grunt css              # make css
 ```
