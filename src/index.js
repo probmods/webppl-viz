@@ -306,65 +306,6 @@ kindPrinter.ccc = function(types, support, scores) {
   // todo
 }
 
-var renderArray = function(specs/*: array */, regularVega) {
-  var nSpecsRemaining = specs.length;
-
-  var resultContainer = wpEditor.makeResultContainer();
-
-  // div that holds selected item
-  var $zoomDiv = $("<div>").addClass("zoomDiv");
-
-  _.each(specs,
-         function(spec) {
-
-           var vgSpec = regularVega ? spec : vl.compile(spec).spec;
-           var thumbnailContainer = $('<div>').addClass('thumbnail');
-
-           $(resultContainer).append(thumbnailContainer);
-
-           vg.parse.spec(vgSpec,
-                         function(error, chart) {
-                           // TODO: current thumbnail sizing is hacky, figure out more idiomatic way
-                           var view = chart({el: thumbnailContainer[0], renderer: 'svg'}).update();
-
-                           var $svg = $(view._el).find("svg");
-
-                           var origHeight = $svg.attr("height");
-                           var origWidth = $svg.attr("width");
-                           var origTransform = $svg.children().attr("transform");
-
-                           $svg.attr({height: origHeight * 0.2,
-                                      width: origWidth * 0.2});
-
-
-                           $svg.children().attr("transform","scale(0.2) " + origTransform );
-
-                           $svg.click(function() {
-                             //console.log('todo')
-
-                             var $zoomSvg = $(this)
-                                 .clone()
-                                 .attr({height: origHeight,
-                                        width: origWidth})
-
-                             debugger;
-                             $zoomSvg.children().attr("transform", origTransform);
-
-                             $zoomDiv
-                               .empty()
-                               .append($zoomSvg);
-                           })
-
-                         });
-         }
-        );
-
-  $(resultContainer)
-    .append($("<div>").addClass("clearboth"))
-    .append($zoomDiv);
-
-
-}
 
 kindPrinter.ccr = function(types, support, scores) {
   var typesExpanded = _.map(types, function(v,k) {
@@ -943,6 +884,67 @@ function renderSpec(spec, regularVega) {
 
 }
 
+// parse an array of vega-lite or regular vega descriptions and render them
+var renderArray = function(specs/*: array */, regularVega) {
+  var nSpecsRemaining = specs.length;
+
+  var resultContainer = wpEditor.makeResultContainer();
+
+  // div that holds selected item
+  var $zoomDiv = $("<div>").addClass("zoomDiv");
+
+  _.each(specs,
+         function(spec) {
+
+           var vgSpec = regularVega ? spec : vl.compile(spec).spec;
+           var thumbnailContainer = $('<div>').addClass('thumbnail');
+
+           $(resultContainer).append(thumbnailContainer);
+
+           vg.parse.spec(vgSpec,
+                         function(error, chart) {
+                           // TODO: current thumbnail sizing is hacky, figure out more idiomatic way
+                           var view = chart({el: thumbnailContainer[0], renderer: 'svg'}).update();
+
+                           var $svg = $(view._el).find("svg");
+
+                           var origHeight = $svg.attr("height");
+                           var origWidth = $svg.attr("width");
+                           var origTransform = $svg.children().attr("transform");
+
+                           $svg.attr({height: origHeight * 0.2,
+                                      width: origWidth * 0.2});
+
+
+                           $svg.children().attr("transform","scale(0.2) " + origTransform );
+
+                           $svg.click(function() {
+                             //console.log('todo')
+
+                             var $zoomSvg = $(this)
+                                 .clone()
+                                 .attr({height: origHeight,
+                                        width: origWidth})
+
+                             debugger;
+                             $zoomSvg.children().attr("transform", origTransform);
+
+                             $zoomDiv
+                               .empty()
+                               .append($zoomSvg);
+                           })
+
+                         });
+         }
+        );
+
+  $(resultContainer)
+    .append($("<div>").addClass("clearboth"))
+    .append($zoomDiv);
+
+
+}
+
 // TODO: groupBy defaults to the third key in df
 // TODO: clean up options stuff
 function barDfs(df, options) {
@@ -1012,7 +1014,7 @@ function barDispatch() {
 }
 
 // currently hist operates on a collection of samples as well (e.g., from repeat)
-function  hist(obj, options) {
+function hist(obj, options) {
   options = _.defaults(options || {},
                        {numBins: 30})
 
