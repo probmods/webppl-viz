@@ -447,10 +447,17 @@ var removeProperties = {
   symbol: ['x2','xc','width','y2','yc','height']
 }
 
+var requiredProperties = {
+  symbol: ['x','y', 'stroke']
+}
+
 var defaultValues = {
   symbol: {
-    fill: "#99ccff",
-    stroke: "#4682b4"
+    fill: {value: "#99ccff"},
+    stroke: {value: "#4682b4"},
+    strokeWidth: {value: 1},
+    size: {value: 30},
+    opacity: {value: 0.8}
   }
 }
 
@@ -459,44 +466,133 @@ var testMarks = ['symbol'];
 // TODO: plug in type inference from vega-lite
 var getType = function(v) {
   var t = typeof v;
-  return {number: 'real',
+  return {number: 'quantitative',
           string: 'nominal'
          }[t]
 }
 
+// sample a random subset
+// todo: implement version that takes size of the subset as an argument
+var subset = function(xs, _p) {
+  var p = (_p === undefined) ? 0.5 : _p;
+  return _.flatten(map(function(x) { return flip(p) ? x : [] }, xs))
+}
+
+util.seedRNG(1)
+
+var pam = function(xs,f) {
+  return map(f,xs)
+}
+
+var pam2 = function(xs,ys,f) {
+  return map2(f,xs,ys)
+}
+
+var pamObject = function(o,f) {
+  return mapObject(f,o)
+}
+
+// maps vName onto ranges
+var ranges = {
+  x: 'width',
+  y: 'height',
+  fill: ["#eeeeee","#313695"],
+  stroke: ["#a50026", "#333333"],
+  size: [1, 10]
+}
+
+// should show the relationship
+// prob ~ .
 var multiviz = function(df) {
   var columnNames = _.keys(df[0]);
   var columnTypes = map(getType, _.values(df[0]));
+  var columnTypesDict = _.object(columnNames, columnTypes);
+
+
+  var sampleMarkMappings = function(m) {
+    // think about move where you fix required properties
+    var requiredVNames = requiredProperties[m];
+    var optionalVNames = subset(_.keys(defaultValues[m]), 0.2);
+
+    var vNames = append(requiredVNames, optionalVNames);
+
+    // for each name, sample an ldim
+    var lNames = subset(columnNames, 0.2);
+
+    condition(vNames.length == lNames.length);
+
+    return _.object(vNames, lNames);
+  }
 
   var model = function() {
-    var sampledMarks = [uniformDraw(testMarks)];
+    var markNames = [uniformDraw(testMarks)];
 
-    var addProps = _.union.apply(null,
-                                 map(function(m) { return addProperties[m] },
-                                     sampledMarks)
-                                );
+    var markMappings = map(sampleMarkMappings, markNames);
 
-    var removeProps = _.union.apply(null,
-                                   map(function(m) { return removeProperties[m] },
-                                       sampledMarks)
-                                  );
+    // TODO: think about treating props that are shared across all marks differently
+    // e.g. rewarding mapping them to the same ldim. we can use size principle to do some
+    // of this work (or DPmem?)
 
-    var props = _.difference(_.union(sharedProperties, addProps),
-                             removeProps)
+    // for each mark mapset, make a scale for all the vdims in it
+    var scales = _.flatten(map2(
+      function(mName, _mapset) {
+        var mapset = _.pairs(_mapset);
 
-    console.log(props)
-    process.exit()
+        return pam(mapset,
+                   function(pair) {
+                     var vName = pair[0];
+                     var lName = pair[1];
+
+                     var type = {quantitative: 'linear', nominal: 'ordinal'}[columnTypesDict[lName]];
+
+                     // TODO: add "zero" and "nice" properties
+                     return {
+                       name: mName + '_' + vName,
+                       type: type,
+                       domain: {data: 'df', field: lName},
+                       range: ranges[vName]
+                     }
+
+                   });
+      },
+      markNames,
+      markMappings));
+
+    var marks = pam2(
+      markNames,
+      markMappings,
+      function(mName, mapset) {
+
+        var sampledProps = pamObject(mapset, function(k,v) {
+          return {"scale": mName + "_" + k,
+                  "field": v};
+        });
+
+        var props = _.extendOwn({},
+                                defaultValues[mName],
+                                sampledProps
+                               );
+
+        return _.extend({type: mName,
+                         from: {data: 'df'},
+                         properties: {enter: props}
+                        });
+      })
+
+    // TODO: add legends
+
 
     var spec = {
-      data: [{name: 'df',
-              values: df}]
+      data: [{name: 'df', values: df}],
+      scales: scales,
+      marks: marks
     }
-    return 1
+
+    return spec;
 
   }
 
-  Enumerate(model, 5);
-
+  Rejection(model, 5);
 
 }
 
@@ -520,6 +616,6 @@ var post = MH(function() {
 
 var df = erpToDf(post);
 
+var vpost = multiviz(df).sample();
 
-
-multiviz(df)
+JSON.stringify(vpost,null,2);
