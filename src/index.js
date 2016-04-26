@@ -1033,6 +1033,7 @@ function hist(obj, options) {
         max = _.max(support),
         binWidth = (max-min)/options.numBins;
 
+    // TODO: move into stats.js, maybe rely on d3 methods
     // OPTIMIZE
     var bins = [];
     for(var i = 0; i < options.numBins; i++) {
