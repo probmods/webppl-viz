@@ -1068,26 +1068,52 @@ function hist(obj, options) {
 
 };
 
-var scatter = function(xs, ys, options) {
-  options = _.defaults(options || {},
-                       {xLabel: 'x',
-                        yLabel: 'y'});
+function scatterDfs(df, options) {
 
-  var data = _.zip(xs,ys).map(function(pair) {
-    return {x: pair[0], y: pair[1]}
-  })
+  options = _.defaults(options || {},
+                       {groupBy: false
+                       })
+
+  var xName = _.keys(df[0])[0];
+  var yName = _.keys(df[0])[1];
 
   var vlSpec = {
-    "data": {"values": data},
+    "data": {"values": df},
     "mark": "point",
     "encoding": {
-      "x": {"field": "x","type": "quantitative", axis: {title: options.xLabel}},
-      "y": {"field": "y","type": "quantitative", axis: {title: options.yLabel}}
+      "x": {"field": xName, "type": "quantitative", axis: {title: options.xName}},
+      "y": {"field": yName, "type": "quantitative", axis: {title: options.yName}}
+    }
+  }
+
+  if (options.groupBy) {
+    vlSpec.encoding.color = {
+      field: options.groupBy,
+      type: 'nominal'
     }
   }
 
   renderSpec(vlSpec);
 }
+
+function scatterDispatch() {
+  var args = _.toArray(arguments);
+
+  if (isDataFrame(arguments[0])) {
+    scatterDfs.apply(null,args)
+  } else {
+    var xs = args[0];
+    var ys = args[1];
+
+    var df = [];
+    for(var i = 0, ii = xs.length; i < ii; i++) {
+      df.push({x: xs[i], y: ys[i]})
+    }
+
+    scatterDfs.apply(null,[df].concat(args.slice(2)));
+  }
+}
+
 
 // input: a list of samples and, optionally, a kernel function
 // output: a list of estimated densities (range is min to max and number of bins is 100)
@@ -1508,7 +1534,7 @@ global.viz = {
   auto: auto,
   bar: barDispatch,
   hist: hist,
-  scatter: scatter,
+  scatter: scatterDispatch,
   density: density,
   line: lineDispatch,
   table: table,
