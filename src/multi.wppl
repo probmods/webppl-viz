@@ -180,7 +180,8 @@ var multiviz = function(df) {
       markNames,
       markMappings,
       function(mName, _mapset) {
-        var mapset = _.pairs(_mapset);
+        var mapset = filter(function(pair) { return _.contains(['x','y'], pair[0]) },
+                            _.pairs(_mapset));
 
         return pam(mapset,
                    function(pair) {
