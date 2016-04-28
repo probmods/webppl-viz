@@ -550,7 +550,8 @@ var multiviz = function(df) {
                        name: mName + '_' + vName,
                        type: type,
                        domain: {data: 'df', field: lName},
-                       range: ranges[vName]
+                       range: ranges[vName],
+                       points: (mName == 'symbol')
                      }
 
                    });
