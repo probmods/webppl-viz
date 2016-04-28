@@ -73,7 +73,7 @@ var subset = function(xs, _p) {
   return _.flatten(map(function(x) { return flip(p) ? x : [] }, xs))
 }
 
-util.seedRNG(1)
+util.seedRNG(4)
 
 var pam = function(xs,f) {
   return map(f,xs)
@@ -107,12 +107,12 @@ var multiviz = function(df) {
   var sampleMarkMappings = function(m) {
     // think about move where you fix required properties
     var requiredVNames = requiredProperties[m];
-    var optionalVNames = subset(_.keys(defaultValues[m]), 0.2);
+    var optionalVNames = subset(_.keys(defaultValues[m]), 0.5);
 
     var vNames = append(requiredVNames, optionalVNames);
 
     // for each name, sample an ldim
-    var lNames = subset(columnNames, 0.2);
+    var lNames = subset(columnNames, 0.5);
 
     condition(vNames.length == lNames.length);
 
@@ -123,6 +123,7 @@ var multiviz = function(df) {
     var markNames = [uniformDraw(testMarks)];
 
     var markMappings = map(sampleMarkMappings, markNames);
+    condition(_.size(markMappings[0]) > 3)
 
     // TODO: think about treating props that are shared across all marks differently
     // e.g. rewarding mapping them to the same ldim. we can use size principle to do some
@@ -198,19 +199,46 @@ var multiviz = function(df) {
     ));
 
     // TODO: add legends
+    var legends = _.flatten(pam2(
+      markNames,
+      markMappings,
+      function(mName, _mapset) {
+        var mapset = _.object(filter(function(pair) { return !_.contains(['x','y'],pair[0]) },
+                                     _.pairs(_mapset)));
+
+        // group vdims by the ldim they portray
+        // (individual vega legends all have to have the same domain)
+        // HACKY (because we can't pass a function to groupBy)
+        var mapsetGrouped = _.pairs(_.groupBy(_.pairs(mapset), '1'));
+
+        var r = pam(mapsetGrouped,
+                    function(pair) {
+                      var lName = pair[0];
+                      var vNames = _.pluck(pair[1],'0');
+
+                      return _.object(pam(vNames,
+                                          function(vName) { return [vName, mName + "_" + vName] }))
+                    }
+                   )
+
+        return r;
+      }
+    ));
+
 
     var spec = {
       data: [{name: 'df', values: df}],
       scales: scales,
       axes: axes,
-      marks: marks
+      marks: marks,
+      legends: legends
     }
 
     return spec;
 
   }
 
-  Rejection(model, 5);
+  Rejection(model, 10);
 
 }
 
