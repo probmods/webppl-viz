@@ -577,14 +577,35 @@ var multiviz = function(df) {
                          from: {data: 'df'},
                          properties: {enter: props}
                         });
-      })
+      });
+
+    // add axes
+    var axes = _.flatten(pam2(
+      markNames,
+      markMappings,
+      function(mName, _mapset) {
+        var mapset = _.pairs(_mapset);
+
+        return pam(mapset,
+                   function(pair) {
+                     var vName = pair[0];
+                     var lName = pair[1];
+
+                     return {
+                       type: vName,
+                       scale: mName + "_" + vName
+                     }
+
+                   });
+      }
+    ));
 
     // TODO: add legends
-
 
     var spec = {
       data: [{name: 'df', values: df}],
       scales: scales,
+      axes: axes,
       marks: marks
     }
 
