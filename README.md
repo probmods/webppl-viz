@@ -36,7 +36,8 @@ Options:
 - `horizontal` (default: false). Draw a horizontal bar chart rather than vertical one. (TODO)
 - `xLabel` (default: x). x axis label.
 - `yLabel` (default: y). y axis label.
-- `xType` (default: y). y axis label.
+- `xType` (default: nominal). type of x axis (nominal or quantitative).
+- `groupBy` (default: none). Grouping variable for different bars.
 
 ### Histogram
 
