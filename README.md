@@ -1,4 +1,4 @@
-Visualization functions for WebPPL (browser only, for now)
+WebPPL visualization library
 
 Demo: http://probmods.github.io/webppl-viz/
 
