@@ -26,7 +26,7 @@ function isErp(x) {
 function scorer(erp, val) {
   // backwards compatible with both webppl 0.7.0+ (foo.score(val))
   // and earlier versions: foo.score(null, val)
-  if (erp.score.toString().split("\n")[0].indexOf("params") > -1) {
+  if (erp.score.length == 2) {
     // old versions of scorers look like "function(params, val) {...}"
     return erp.score(null, val)
   } else {
