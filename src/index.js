@@ -23,6 +23,17 @@ function isErp(x) {
   return x.support && x.score;
 }
 
+function scorer(erp, val) {
+  // backwards compatible with both webppl 0.7.0+ (foo.score(val))
+  // and earlier versions: foo.score(null, val)
+  if (erp.score.toString().split("\n")[0].indexOf("params") > -1) {
+    // old versions of scorers look like "function(params, val) {...}"
+    return erp.score(null, val)
+  } else {
+    return erp.score(val)
+  }
+}
+
 // convert a list of samples to an ERP
 function samplesToErp(xs) {
   var n = xs.length;
@@ -667,7 +678,7 @@ function auto(obj) {
   }
 
   var scores = _.map(support,
-                     function(state){return obj.score(null, state);});
+                     function(state){return scorer(obj, state)});
 
   if (isVector(support)) {
     // promote vector into data frame with a single column ("state")
@@ -1027,7 +1038,7 @@ function hist(obj, options) {
   }
 
   var support = erp.support();
-  var probs = support.map(function(x) { return Math.exp(erp.score(null, x)) });
+  var probs = support.map(function(x) { return Math.exp(scorer(erp, x)) });
   if (typeof support[0] == 'number') {
     var min = _.min(support),
         max = _.max(support),
@@ -1049,7 +1060,7 @@ function hist(obj, options) {
     bins[bins.length-1].upper += Number.EPSILON;
 
     var binProbs = bins.map(function(bin) {
-      return util.sum(_.map(bin.entries, function(x) { return Math.exp(erp.score(null, x)) }));
+      return util.sum(_.map(bin.entries, function(x) { return Math.exp(scorer(erp, x)) }));
     })
 
     // TODO: do ticks based on bin boundaries, rather than showing bin means, as i've done here
@@ -1305,7 +1316,7 @@ function table(obj, options) {
   }
 
   var support = erp.support();
-  var scores = support.map(function(state) { return erp.score(null,state) });
+  var scores = support.map(function(state) { return scorer(erp,state) });
 
   var sortedZipped = _.sortBy(_.zip(support, scores),function(z) {
     return -z[1]
