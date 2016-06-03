@@ -46,7 +46,7 @@
     "open": "0.0.5",
     "through": "^2.3.8",
     "watchify": "^3.7.0",
-    "webppl": "probmods/webppl",
-    "webppl-editor": "probmods/webppl-editor"
+    "webppl": "probmods/webppl#v0.7.0",
+    "webppl-editor": "probmods/webppl-editor#95236b9"
   }
 }
