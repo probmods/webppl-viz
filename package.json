@@ -11,7 +11,7 @@
     "url": "https://github.com/probmods/webppl-viz.git"
   },
   "browserify": {
-    "transform": []
+      "transform": [["babelify", { "presets": ["react"] }]]
   },
   "author": "Long Ouyang",
   "license": "MIT",
