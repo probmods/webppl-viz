@@ -1335,7 +1335,9 @@ function table(obj, options) {
 
 }
 
-global.viz = {
+
+
+var viz = {
   d3auto: require('./old').print,
   auto: auto,
   bar: barDispatch,
@@ -1345,4 +1347,16 @@ global.viz = {
   line: lineDispatch,
   table: table,
   heatMap: heatMap
+}
+
+// behave both as a browser library and a node module
+// (HT underscore library)
+var root = this;
+if (typeof exports !== 'undefined') {
+  if (typeof module !== 'undefined' && module.exports) {
+    exports = module.exports = viz;
+  }
+  exports.viz = viz;
+} else {
+  root.viz = viz;
 }
