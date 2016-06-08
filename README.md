@@ -7,7 +7,10 @@ Dependencies:
 - webppl (0.7.0-a57eea7 or later)
 - webppl-editor (eeb3208 or later)
 
-Usage: include webppl-viz.js and webppl-viz.css in your web page.
+Usage:
+
+- Browser: include webppl-viz.js and webppl-viz.css in your web page.
+- Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages)
 
 ## Standard functions
 
