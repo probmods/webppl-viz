@@ -34,12 +34,14 @@ function makeBinaryDerivatives(code1, code2) {
 	} else  {
 		return {
 			scalar: [
+				// First arg is definitely a Node, second may or may not be
 				new Function('_x', '_y', [
 					'var x = _x.x;',
 					'var y = (typeof _y === "number") ? _y : _y.x;',
 					'var out = this.x;',
 					'_x.dx += (' + code1 + ') * this.dx;'
 				].join('\n')),
+				// Second arg is definitely a Node, first may or may not be
 				new Function('_x', '_y', [
 					'var x = (typeof _x === "number") ? _x : _x.x;',
 					'var y = _y.x;',
@@ -47,27 +49,53 @@ function makeBinaryDerivatives(code1, code2) {
 					'_y.dx += (' + code2 + ') * this.dx;'
 				].join('\n'))
 			],
+			// To match the implementations of the methods on Tensor objects,
+			//    the second argument might be a scalar or a Tensor.
 			tensor: [
+				// First arg is definitely a Node, second may or may not be
 				new Function('_x', '_y', [
 					'var _xx = _x.x;',
 					'var _yx = _y.x || _y;',
 					'var n = _xx.length;',
-					'while (n--) {',
-					'	var x = _xx.data[n];',
-					'	var y = _yx.data[n];',
-					'	var out = this.x.data[n];',
-					'   _x.dx.data[n] += (' + code1 + ') * this.dx.data[n];',
-					'}'
+					// y is a scalar
+					'if (typeof _yx === "number") {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx;',
+					'		var out = this.x.data[n];',
+					'	   _x.dx.data[n] += (' + code1 + ') * this.dx.data[n];',
+					'	}',
+					// y is a tensor 
+					'} else {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx.data[n];',
+					'		var out = this.x.data[n];',
+					'	   _x.dx.data[n] += (' + code1 + ') * this.dx.data[n];',
+					'	}',
+					'}',
 				].join('\n')),
+				// Second arg is definitely a Node, first may or may not be
 				new Function('_x', '_y', [
 					'var _xx = _x.x || _x;',
 					'var _yx = _y.x;',
-					'var n = _yx.length;',
-					'while (n--) {',
-					'	var x = _xx.data[n];',
-					'	var y = _yx.data[n];',
-					'	var out = this.x.data[n];',
-					'   _y.dx.data[n] += (' + code2 + ') * this.dx.data[n];',
+					'var n = _xx.length;',
+					// y is a scalar
+					'if (typeof _yx === "number") {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx;',
+					'		var out = this.x.data[n];',
+					'	   _y.dx += (' + code2 + ') * this.dx.data[n];',
+					'	}',
+					// y is a tensor
+					'} else {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx.data[n];',
+					'		var out = this.x.data[n];',
+					'	   _y.dx.data[n] += (' + code2 + ') * this.dx.data[n];',
+					'	}',
 					'}'
 				].join('\n'))
 			]
@@ -78,6 +106,7 @@ function makeBinaryDerivatives(code1, code2) {
 
 var d = {};
 
+d.neg = makeUnaryDerivatives('-1');
 d.add = makeBinaryDerivatives('1', '1');
 d.sub = makeBinaryDerivatives('1', '-1');
 d.mul = makeBinaryDerivatives('y', 'x');
@@ -294,7 +323,7 @@ module.exports = {
 
 
 
-},{"../tensor.js":7,"./graph.js":4,"assert":192}],3:[function(require,module,exports){
+},{"../tensor.js":7,"./graph.js":4,"assert":194}],3:[function(require,module,exports){
 'use strict';
 
 var Tensor = require('../tensor.js');
@@ -323,8 +352,23 @@ function makeFunctions(OutputType) {
 
 	var namePrefix = OutputType === Scalar ? 'scalar.' : 'tensor.';
 
-	// Lifted operators
-	var ops = {
+	// Lifted unary operators
+	var unops = {
+		neg: OutputType === Tensor ?
+			function(x) { return x.neg(); } :
+			function(x) { return -x; }
+	};
+	for (var op in unops) {
+		fns[op] = func.newUnaryFunction({
+			OutputType: OutputType,
+			name: namePrefix+op,
+			forward: unops[op],
+			backward: backward(derivs[op])
+		});
+	}
+
+	// Lifted binary operators
+	var binops = {
 		add: OutputType === Tensor ?
 			function(x, y) { return x.add(y); } :
 			function(x, y) { return x + y; },
@@ -338,11 +382,11 @@ function makeFunctions(OutputType) {
 			function(x, y) { return x.div(y); } :
 			function(x, y) { return x / y; }
 	};
-	for (var op in ops) {
+	for (var op in binops) {
 		fns[op] = func.newBinaryFunction({
 			OutputType: OutputType,
 			name: namePrefix+op,
-			forward: ops[op],
+			forward: binops[op],
 			backward1: backward(derivs[op])[0],
 			backward2: backward(derivs[op])[1]
 		});
@@ -382,6 +426,14 @@ function makeFunctions(OutputType) {
 			backward2: backward(derivs[fnname])[1]
 		});
 	}
+
+	// NaN and infinity checks
+	fns.isNaN = OutputType === Scalar ?
+		func.liftUnaryFunction(isNaN) :
+		func.liftUnaryFunction(function(t) { return t.isNaN(); });
+	fns.isFinite = OutputType === Scalar ?
+		func.liftUnaryFunction(isFinite) :
+		func.liftUnaryFunction(function(t) { return t.isFinite(); });
 
 	return fns;
 }
@@ -435,6 +487,147 @@ fns.scalar.leq = func.liftBinaryFunction(
 );
 
 
+// Matrix operations  -----------------------------------------------------
+
+
+fns.tensor.transpose = func.newUnaryFunction({
+  OutputType: Tensor,
+  name: 'transpose',
+  forward: function(a) {
+    return a.transpose();
+  },
+  backward: function(a) {
+    var h = this.x.dims[0];
+    var w = this.x.dims[1];
+    for (var i = 0; i < h; i++) {
+      for (var j = 0; j < w; j++) {
+        a.dx.data[j * h + i] += this.dx.data[i * w + j];
+      }
+    }
+  }
+});
+
+fns.tensor.diagonal = func.newUnaryFunction({
+  OutputType: Tensor,
+  name: 'diagonal',
+  forward: function(a) {
+    return a.diagonal();
+  },
+  backward: function(a) {
+    var n = a.dx.dims[0];
+    for (var i = 0; i < n; i++) {
+      a.dx.data[i] += this.dx.data[i * (n + 1)];
+    }
+  }
+});
+
+fns.tensor.inverse = func.newUnaryFunction({
+  OutputType: Tensor,
+  name: 'inverse',
+  forward: function(A) {
+    return A.inverse();
+  },
+  backward: function(A) {
+    var xT = this.x.T();
+    A.dx = A.dx.add(xT.dot(this.dx).dot(xT).neg());
+  }
+});
+
+fns.tensor.determinant = func.newUnaryFunction({
+  OutputType: Number,
+  name: 'determinant',
+  forward: function(A) {
+    return A.determinant();
+  },
+  backward: function(A) {
+    // A is square matrix.
+    // Assume A is invertable.
+    var n = A.x.dims[0];
+    var invA = A.x.inv();
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        A.dx.data[i * n + j] += this.x * this.dx * invA.data[j * n + i];
+      }
+    }
+  }
+});
+
+fns.tensor.dot = func.newBinaryFunction({
+  OutputType: Tensor,
+  name: 'dot',
+  forward: function(a, b) {
+    return a.dot(b);
+  },
+  backward1: function(A, B) {
+    var Ap = ad.value(A);
+    var Bp = ad.value(B);
+
+    var Ah = Ap.dims[0];
+    var Aw = Ap.dims[1];
+    var Bw = Bp.dims[1];
+    var wout = Bw;
+
+    for (var l = 0; l < Ah; l++) {
+      for (var m = 0; m < Aw; m++) {
+        var z = 0;
+        for (var j = 0; j < wout; j++) {
+          z += this.dx.data[l * wout + j] * Bp.data[m * Bw + j];
+        }
+        A.dx.data[l * Aw + m] += z;
+      }
+    }
+  },
+  backward2: function(A, B) {
+    var Ap = ad.value(A);
+    var Bp = ad.value(B);
+
+    var Ah = Ap.dims[0];
+    var Aw = Ap.dims[1];
+    var Bh = Bp.dims[0];
+    var Bw = Bp.dims[1];
+    var wout = Bw;
+
+    for (var l = 0; l < Bh; l++) {
+      for (var m = 0; m < Bw; m++) {
+        var z = 0;
+        for (var i = 0; i < Ah; i++) {
+          z += this.dx.data[i * wout + m] * Ap.data[i * Aw + l];
+        }
+        B.dx.data[l * Bw + m] += z;
+      }
+    }
+
+  }
+});
+
+
+// Tensor reductions  -----------------------------------------------------
+
+
+fns.tensor.sumreduce = func.newUnaryFunction({
+	OutputType: Scalar,
+	name: 'sumreduce',
+	forward: function(t) {
+		return t.sumreduce();
+	},
+	backward: function(t) {
+		var n = t.dx.data.length;
+		while (n--) {
+			t.dx.data[n] += this.dx;
+		}
+	}
+});
+
+fns.tensor.allreduce = func.liftUnaryFunction(function(t) {
+	return t.allreduce();
+});
+
+fns.tensor.anyreduce = func.liftUnaryFunction(function(t) {
+	return t.anyreduce();
+});
+
+// TODO: min/max?
+
 
 // Scalar/tensor shaping operations ---------------------------------------
 
@@ -487,7 +680,7 @@ fns.tensor.range = func.newFunction({
 			var n = end - start;
 			while (n--) {
 				var i = start + n;
-				this.dx.data[i] += t.dx.data[n];
+				t.dx.data[i] += this.dx.data[n];
 			}
 		}
 	},
@@ -637,21 +830,6 @@ fns.scalar.sum = func.newFunction({
 	getParents: func.naryGetParents
 });
 
-// Sum reduce a tensor
-fns.sumreduce = func.newUnaryFunction({
-	OutputType: Scalar,
-	name: 'sumreduce',
-	forward: function(t) {
-		return t.sumreduce();
-	},
-	backward: function(t) {
-		var n = t.dx.data.length;
-		while (n--) {
-			t.dx.data[n] += this.dx;
-		}
-	}
-});
-
 // http://stats.stackexchange.com/questions/79454/softmax-layer-in-a-neural-network
 fns.tensor.softmax = func.newUnaryFunction({
 	OutputType: Tensor,
@@ -722,10 +900,17 @@ Node.prototype.backpropRec = function() {
 		while (n--) this.parents[n].backpropRec();
 	}
 };
+Node.prototype.zeroDerivativesRec = function() {
+	this.outDegree--;
+	if (this.outDegree === 0) {
+		this.zeroDerivativesImpl();
+		var n = this.parents.length;
+		while (n--) this.parents[n].zeroDerivativesRec();
+	}
+};
 Node.prototype.zeroDerivatives = function() {
-	this.zeroDerivativesImpl();
-	var n = this.parents.length;
-	while (n--) this.parents[n].zeroDerivatives();
+	this.computeOutDegree();
+	this.zeroDerivativesRec();
 };
 // By default, backward does nothing
 Node.prototype.backward = function() {};
@@ -804,6 +989,7 @@ module.exports = {
 },{"../tensor.js":7}],5:[function(require,module,exports){
 'use strict';
 
+var utils = require('../utils.js');
 var graph = require('./graph.js');
 var Tensor = require('../tensor.js');
 
@@ -834,22 +1020,16 @@ ad.params = function(dims, name) {
 
 var func = require('./func.js');
 var functions = require('./functions.js');
-var modules = [
-	func, functions
-];
+ad = utils.mergeObjects(ad, func, functions);
+
+
 // The macro-transform code only works via node
 if (typeof window === "undefined") {
-	modules.push(require('./transform.js'));
-}
-for (var i = 0; i < modules.length; i++) {
-	var m = modules[i];
-	for (var prop in m) {
-		ad[prop] = m[prop];
-	}
+	ad = utils.mergeObjects(ad, require('./transform.js'));
 }
 
 module.exports = ad;
-},{"../tensor.js":7,"./func.js":2,"./functions.js":3,"./graph.js":4,"./transform.js":6}],6:[function(require,module,exports){
+},{"../tensor.js":7,"../utils.js":8,"./func.js":2,"./functions.js":3,"./graph.js":4,"./transform.js":6}],6:[function(require,module,exports){
 (function (__dirname){
 'use strict';
 
@@ -907,7 +1087,7 @@ module.exports = {
 	macroRequire: macroRequire
 }
 }).call(this,"/node_modules/adnn/ad")
-},{"child_process":191,"fs":191,"sweet.js":123}],7:[function(require,module,exports){
+},{"child_process":193,"fs":193,"sweet.js":123}],7:[function(require,module,exports){
 'use strict';
 
 var assert = require('assert');
@@ -961,6 +1141,7 @@ Tensor.prototype.reshape = function(dims) {
 	while (n--) size *= dims[n];
 	assert(size === this.length, 'Tensor reshape invalid size');
 	this.dims = dims;
+  return this;
 }
 
 Tensor.prototype.fill = function(val) {
@@ -1059,7 +1240,7 @@ Tensor.prototype.fromArray = function(arr) {
 };
 
 Tensor.prototype.toString = function() {
-	return this.toArray();
+	return this.toArray().toString();
 };
 
 
@@ -1209,27 +1390,222 @@ Tensor.prototype.softmax = function() {
 };
 
 
+// Do the conservative thing, and return a copy for now.
+Tensor.prototype.transpose = function() {
+  assert.ok(this.rank === 2);
+  var h = this.dims[0];
+  var w = this.dims[1];
+  var y = new Tensor([w, h]);
+  for (var i = 0; i < h; i++) {
+    for (var j = 0; j < w; j++) {
+      y.data[j * h + i] = this.data[i * w + j];
+    }
+  }
+  return y;
+};
+
+Tensor.prototype.diagonal = function() {
+  assert.ok(this.rank === 2);
+  assert.ok(this.dims[1] === 1);
+  var n = this.dims[0];
+  var y = new Tensor([n, n]);
+  for (var i = 0; i < n; i++) {
+    y.data[i * (n + 1)] = this.data[i];
+  }
+  return y;
+};
+
+// Matrix inverse.
+// Ported from numeric.js.
+Tensor.prototype.inverse = function() {
+
+  assert.ok(this.rank === 2);
+  assert.ok(this.dims[0] === this.dims[1]);
+  var n = this.dims[0];
+
+  var Ai, Aj;
+  var Ii, Ij;
+  var i, j, k, x;
+
+  var A = [];
+  for (i = 0; i < n; i++) {
+    Ai = new Float64Array(n);
+    A.push(Ai);
+    for (j = 0; j < n; j++) {
+      Ai[j] = this.data[i * n + j];
+    }
+  }
+
+  // Not using Float64 here as I want the convinience of passing I to
+  // fromArray() which doesn't currently work with Float64Array.
+  var I = [];
+  for (i = 0; i < n; i++) {
+    Ii = new Array(n);
+    I.push(Ii);
+    for (j = 0; j < n; j++) {
+      Ii[j] = i === j ? 1 : 0;
+    }
+  }
+
+  for (j = 0; j < n; ++j) {
+    var i0 = -1;
+    var v0 = -1;
+    for (i = j; i !== n; ++i) {
+      k = Math.abs(A[i][j]);
+      if (k > v0) {
+        i0 = i; v0 = k;
+      }
+    }
+    Aj = A[i0];
+    A[i0] = A[j];
+    A[j] = Aj;
+    Ij = I[i0];
+    I[i0] = I[j];
+    I[j] = Ij;
+    x = Aj[j];
+    for (k = j; k !== n; ++k) {
+      Aj[k] /= x;
+    }
+    for (k = n - 1; k !== -1; --k) {
+      Ij[k] /= x;
+    }
+    for (i = n - 1; i !== -1; --i) {
+      if (i !== j) {
+        Ai = A[i];
+        Ii = I[i];
+        x = Ai[j];
+        for (k = j + 1; k !== n; ++k) {
+          Ai[k] -= Aj[k] * x;
+        }
+        for (k = n - 1; k > 0; --k) {
+          Ii[k] -= Ij[k] * x;
+          --k;
+          Ii[k] -= Ij[k] * x;
+        }
+        if (k === 0) {
+          Ii[0] -= Ij[0] * x;
+        }
+      }
+    }
+  }
+  return new Tensor([n, n]).fromArray(I);
+};
+
+// Determinant.
+// Ported from numeric.js.
+Tensor.prototype.determinant = function() {
+  assert.ok(this.rank === 2);
+  assert.ok(this.dims[0] === this.dims[1]);
+  var n = this.dims[0];
+  var ret = 1;
+
+  var i, j, k;
+  var Aj, Ai, alpha, temp, k1, k2, k3;
+
+  var A = [];
+  for (i = 0; i < n; i++) {
+    Ai = new Float64Array(n);
+    A.push(Ai);
+    for (j = 0; j < n; j++) {
+      Ai[j] = this.data[i * n + j];
+    }
+  }
+
+  for (j = 0; j < n - 1; j++) {
+    k = j;
+    for (i = j + 1; i < n; i++) {
+      if (Math.abs(A[i][j]) > Math.abs(A[k][j])) {
+        k = i;
+      }
+    }
+    if (k !== j) {
+      temp = A[k];
+      A[k] = A[j];
+      A[j] = temp;
+      ret *= -1;
+    }
+    Aj = A[j];
+    for (i = j + 1; i < n; i++) {
+      Ai = A[i];
+      alpha = Ai[j] / Aj[j];
+      for (k = j + 1; k < n - 1; k += 2) {
+        k1 = k + 1;
+        Ai[k] -= Aj[k] * alpha;
+        Ai[k1] -= Aj[k1] * alpha;
+      }
+      if (k !== n) {
+        Ai[k] -= Aj[k] * alpha;
+      }
+    }
+    if (Aj[j] === 0) {
+      return 0;
+    }
+    ret *= Aj[j];
+  }
+  return ret * A[j][j];
+};
+
+Tensor.prototype.dot = function(t) {
+  var a = this, b = t;
+
+  if (a.rank !== 2 || b.rank !== 2) {
+    throw new Error('Inputs to dot should have rank = 2.');
+  }
+  if (a.dims[1] !== b.dims[0]) {
+    throw new Error('Dimension mismatch in dot. Inputs have dimension ' + a.dims + ' and ' + b.dims + '.');
+  }
+
+  var l = a.dims[1];
+  var h = a.dims[0], w = b.dims[1];
+  var y = new Tensor([h, w]);
+
+  for (var r = 0; r < h; r++) {
+    for (var c = 0; c < w; c++) {
+      var z = 0;
+      for (var i = 0; i < l; i++) {
+        z += a.data[r * l + i] * b.data[w * i + c];
+      }
+      y.data[r * w + c] = z;
+    }
+  }
+  return y;
+};
+
+Tensor.prototype.cholesky = function() {
+  var a = this;
+  assert.ok((a.rank === 2) && (a.dims[0] === a.dims[1]),
+            'cholesky is only defined for square matrices.');
+
+  // If a isn't positive-definite then the result will silently
+  // include NaNs, no warning is given.
+
+  var s;
+  var n = a.dims[0];
+  var L = new Tensor([n, n]);
+
+  for (var i = 0; i < n; i++) {
+    for (var j = 0; j <= i; j++) {
+      s = 0;
+      for (var k = 0; k < j; k++) {
+        s += L.data[i * n + k] * L.data[j * n + k];
+      }
+      L.data[i * n + j] = (i === j) ?
+          Math.sqrt(a.data[i * n + i] - s) :
+          1 / L.data[j * n + j] * (a.data[i * n + j] - s);
+    }
+  }
+
+  return L;
+};
+
+
 module.exports = Tensor;
 
 
 
 
-},{"./utils.js":8,"assert":192}],8:[function(require,module,exports){
+},{"./utils.js":8,"assert":194}],8:[function(require,module,exports){
 'use strict';
-
-// Simple single-arg function memoization using stringified keys
-function memoize(fn) {
-	var cache = {};
-	return function(x) {
-		var key = x instanceof Function ? x.toString() : JSON.stringify(x);
-		var y = cache[key];
-		if (y === undefined) {
-			y = fn(x);
-			cache[key] = y;
-		}
-		return y;
-	};
-}
 
 function gaussianSample(mu, sigma) {
 	var u, v, x, y, q;
@@ -1254,12 +1630,37 @@ function deduplicate(list) {
 	return retlist;
 }
 
+// source objects from which to copy are in arguments[1] - arguments[arguments.length-1]
+function mergeObjects(tgt) {
+	tgt = tgt || {};
+	for (var i = 1; i < arguments.length; i++) {
+		var src = arguments[i];
+		for (var prop in src) {
+			tgt[prop] = src[prop];
+		}
+	}
+	return tgt;
+}
+
+function cloneObject(obj) {
+	return mergeObjects({}, obj);
+}
+
+function mergeDefaults(obj, defaults) {
+	return mergeObjects({}, defaults, obj);
+}
+
 
 module.exports = {
-	memoize: memoize,
 	gaussianSample: gaussianSample,
-	deduplicate: deduplicate
+	deduplicate: deduplicate,
+	mergeObjects: mergeObjects,
+	cloneObject: cloneObject,
+	mergeDefaults: mergeDefaults
 };
+
+
+
 },{}],9:[function(require,module,exports){
 (function (process,__filename){
 /** vim: et:ts=4:sw=4:sts=4
@@ -1565,7 +1966,7 @@ function amdefine(module, requireFn) {
 module.exports = amdefine;
 
 }).call(this,require('_process'),"/node_modules/amdefine/amdefine.js")
-},{"_process":389,"path":388}],10:[function(require,module,exports){
+},{"_process":391,"path":390}],10:[function(require,module,exports){
 require("./es7");
 
 var types = require("../lib/types");
@@ -34654,7 +35055,7 @@ function Entry (key, value, length, now, maxAge) {
   this.maxAge = maxAge || 0
 }
 
-},{"pseudomap":106,"util":406,"yallist":108}],106:[function(require,module,exports){
+},{"pseudomap":106,"util":408,"yallist":108}],106:[function(require,module,exports){
 (function (process){
 if (process.env.npm_package_name === 'pseudomap' &&
     process.env.npm_lifecycle_script === 'test')
@@ -34667,7 +35068,7 @@ if (typeof Map === 'function' && !process.env.TEST_PSEUDOMAP) {
 }
 
 }).call(this,require('_process'))
-},{"./pseudomap":107,"_process":389}],107:[function(require,module,exports){
+},{"./pseudomap":107,"_process":391}],107:[function(require,module,exports){
 var hasOwnProperty = Object.prototype.hasOwnProperty
 
 module.exports = PseudoMap
@@ -40691,7 +41092,7 @@ if ((typeof module) == 'object' && module.exports) {
   Math    // math: package containing random, pow, and seedrandom
 );
 
-},{"crypto":198}],119:[function(require,module,exports){
+},{"crypto":200}],119:[function(require,module,exports){
 (function (root, factory) {
     if (typeof exports === 'object') {
         // CommonJS
@@ -49416,7 +49817,7 @@ if ((typeof module) == 'object' && module.exports) {
 }));
 
 }).call(this,require('_process'))
-},{"./expander":119,"./parser":120,"./syntax":124,"_process":389,"escodegen":125,"escope":142,"fs":191,"path":388,"resolve/lib/sync":149,"underscore":150}],124:[function(require,module,exports){
+},{"./expander":119,"./parser":120,"./syntax":124,"_process":391,"escodegen":125,"escope":142,"fs":193,"path":390,"resolve/lib/sync":149,"underscore":150}],124:[function(require,module,exports){
 (function (root, factory) {
     if (typeof exports === 'object') {
         // CommonJS
@@ -53480,7 +53881,7 @@ module.exports = function (start, opts) {
     return dirs.concat(opts.paths);
 }
 }).call(this,require('_process'))
-},{"_process":389,"path":388}],149:[function(require,module,exports){
+},{"_process":391,"path":390}],149:[function(require,module,exports){
 var core = require('./core');
 var fs = require('fs');
 var path = require('path');
@@ -53562,7 +53963,7 @@ module.exports = function (x, opts) {
     }
 };
 
-},{"./caller.js":145,"./core":147,"./node-modules-paths.js":148,"fs":191,"path":388}],150:[function(require,module,exports){
+},{"./caller.js":145,"./core":147,"./node-modules-paths.js":148,"fs":193,"path":390}],150:[function(require,module,exports){
 //     Underscore.js 1.3.3
 //     (c) 2009-2012 Jeremy Ashkenas, DocumentCloud Inc.
 //     Underscore is freely distributable under the MIT license.
@@ -56201,27 +56602,98 @@ module.exports = ad;
 
 },{"adnn/ad":5,"underscore":151}],153:[function(require,module,exports){
 'use strict';
+
+var _ = require('underscore');
+var util = require('../util');
+var ad = require('../ad');
+var dists = require('../dists');
+
+var CountAggregator = function() {
+  this.hist = {};
+};
+
+CountAggregator.prototype.add = function(value) {
+  var k = util.serialize(value);
+  if (this.hist[k] === undefined) {
+    this.hist[k] = { count: 0, val: value };
+  }
+  this.hist[k].count += 1;
+};
+
+function normalize(hist) {
+  var totalCount = _.reduce(hist, function(acc, obj) {
+    return acc + obj.count;
+  }, 0);
+  return _.mapObject(hist, function(obj) {
+    return { val: obj.val, prob: obj.count / totalCount };
+  });
+}
+
+CountAggregator.prototype.toDist = function() {
+  return new dists.Marginal({dist: normalize(this.hist)});
+};
+
+module.exports = CountAggregator;
+
+},{"../ad":152,"../dists":162,"../util":192,"underscore":151}],154:[function(require,module,exports){
+'use strict';
+
+var _ = require('underscore');
+var util = require('../util');
+var ad = require('../ad');
+var CountAggregator = require('../aggregation/CountAggregator');
+
+var MaxAggregator = function(retainSamples) {
+  this.max = { value: undefined, score: -Infinity };
+  this.samples = [];
+  this.retainSamples = retainSamples;
+};
+
+MaxAggregator.prototype.add = function(value, score) {
+  if (this.retainSamples) {
+    this.samples.push({ value: value, score: score });
+  }
+  if (score > this.max.score) {
+    this.max.value = value;
+    this.max.score = score;
+  }
+};
+
+MaxAggregator.prototype.toDist = function() {
+  var hist = new CountAggregator();
+  hist.add(this.max.value);
+  var dist = hist.toDist();
+  if (this.retainSamples) {
+    dist.samples = this.samples;
+  }
+  return dist;
+};
+
+module.exports = MaxAggregator;
+
+},{"../ad":152,"../aggregation/CountAggregator":153,"../util":192,"underscore":151}],155:[function(require,module,exports){
+'use strict';
 var ad = require('../ad.js');
 var assert = require('assert');
 var _ = require('underscore');
-var erp = require('../erp');
+var dists = require('../dists');
 var util = require('../util');
 function logsumexp(a, b) {
     assert.ok(ad.scalar.pneq(a, ad.scalar.sub(0, Infinity)) || ad.scalar.pneq(b, ad.scalar.sub(0, Infinity)));
     var m = ad.scalar.max(a, b);
     return ad.scalar.add(ad.scalar.log(ad.scalar.add(ad.scalar.exp(ad.scalar.sub(a, m)), ad.scalar.exp(ad.scalar.sub(b, m)))), m);
 }
-var Distribution = function () {
+var ScoreAggregator = function () {
     this.dist = {};
 };
-Object.defineProperties(Distribution.prototype, {
+Object.defineProperties(ScoreAggregator.prototype, {
     size: {
         get: function () {
             return _.size(this.dist);
         }
     }
 });
-Distribution.prototype.add = function (value, score) {
+ScoreAggregator.prototype.add = function (value, score) {
     if (ad.scalar.peq(score, ad.scalar.sub(0, Infinity))) {
         return;
     }
@@ -56245,85 +56717,11 @@ function normalize(dist) {
         };
     });
 }
-Distribution.prototype.toERP = function () {
-    return erp.makeMarginalERP(normalize(this.dist));
+ScoreAggregator.prototype.toDist = function () {
+    return new dists.Marginal({ dist: normalize(this.dist) });
 };
-module.exports = Distribution;
-},{"../ad.js":152,"../erp":162,"../util":190,"assert":192,"underscore":151}],154:[function(require,module,exports){
-'use strict';
-
-var _ = require('underscore');
-var util = require('../util');
-var ad = require('../ad');
-var erp = require('../erp');
-
-var Histogram = function() {
-  this.hist = {};
-};
-
-Histogram.prototype.add = function(value) {
-  var value = ad.valueRec(value);
-  var k = util.serialize(value);
-  if (this.hist[k] === undefined) {
-    this.hist[k] = { count: 0, val: value };
-  }
-  this.hist[k].count += 1;
-};
-
-function normalize(hist) {
-  var totalCount = _.reduce(hist, function(acc, obj) {
-    return acc + obj.count;
-  }, 0);
-  return _.mapObject(hist, function(obj) {
-    return { val: obj.val, prob: obj.count / totalCount };
-  });
-}
-
-Histogram.prototype.toERP = function() {
-  return erp.makeMarginalERP(normalize(this.hist));
-};
-
-module.exports = Histogram;
-
-},{"../ad":152,"../erp":162,"../util":190,"underscore":151}],155:[function(require,module,exports){
-'use strict';
-
-var _ = require('underscore');
-var util = require('../util');
-var ad = require('../ad');
-var Histogram = require('./histogram');
-
-var MAP = function(retainSamples) {
-  this.max = { value: undefined, score: -Infinity };
-  this.samples = [];
-  this.retainSamples = retainSamples;
-};
-
-MAP.prototype.add = function(value, score) {
-  var value = ad.valueRec(value);
-  var score = ad.value(score);
-  if (this.retainSamples) {
-    this.samples.push({ value: value, score: score });
-  }
-  if (score > this.max.score) {
-    this.max.value = value;
-    this.max.score = score;
-  }
-};
-
-MAP.prototype.toERP = function() {
-  var hist = new Histogram();
-  hist.add(this.max.value);
-  var erp = hist.toERP();
-  if (this.retainSamples) {
-    erp.samples = this.samples;
-  }
-  return erp;
-};
-
-module.exports = MAP;
-
-},{"../ad":152,"../util":190,"./histogram":154,"underscore":151}],156:[function(require,module,exports){
+module.exports = ScoreAggregator;
+},{"../ad.js":152,"../dists":162,"../util":192,"assert":194,"underscore":151}],156:[function(require,module,exports){
 'use strict';
 
 var traverse = require('estraverse').traverse;
@@ -56888,7 +57286,7 @@ function prepare(code, verbose) {
     transforms: [thunkify, naming, cps, optimize],
     verbose: verbose,
     generateCode: false
-  });
+  }).code;
 }
 
 module.exports = {
@@ -56896,7 +57294,7 @@ module.exports = {
   prepare: prepare
 };
 
-},{"../main":178,"../syntax":180,"../transforms/cps":183,"../transforms/naming":185,"../transforms/optimize":186,"./analyze-refs":156,"./match":159,"./match-lang":158,"./parser-combinator":160,"assert":192,"ast-types":26,"escodegen":27,"estraverse":98,"immutable":104}],158:[function(require,module,exports){
+},{"../main":178,"../syntax":180,"../transforms/cps":185,"../transforms/naming":187,"../transforms/optimize":188,"./analyze-refs":156,"./match":159,"./match-lang":158,"./parser-combinator":160,"assert":194,"ast-types":26,"escodegen":27,"estraverse":98,"immutable":104}],158:[function(require,module,exports){
 'use strict';
 var types = require('ast-types').namedTypes;
 
@@ -57202,7 +57600,7 @@ var naming = require('./transforms/naming').naming;
 var thunkify = require('./syntax').thunkify;
 var cps = require('./transforms/cps').cps;
 var analyze = require('./analysis/main').analyze;
-var version = 'v0.6.2-4d0ec8e';
+var version = 'v0.7.0-fe5010a';
 var packages = [];
 var load = _.once(function () {
     packages.forEach(function (pkg) {
@@ -57227,8 +57625,9 @@ function compile(code, options) {
     if (options === undefined) {
         options = {};
     }
-    var optionsExtended = _.extend({ bundles: load() }, options);
-    return webppl.compile(code, optionsExtended);
+    var optionsExtended = _.extend({ bundles: load() }, _.omit(options, 'sourceMap'));
+    var codeAndMap = webppl.compile(code, optionsExtended);
+    return options.sourceMap ? codeAndMap : codeAndMap.code;
 }
 function webpplCPS(code) {
     var programAst = esprima.parse(code);
@@ -57248,181 +57647,246 @@ global.webppl = {
     analyze: analyze
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./analysis/main":157,"./main":178,"./syntax":180,"./transforms/cps":183,"./transforms/naming":185,"./transforms/optimize":186,"escodegen":27,"esprima":97,"fs":191,"underscore":151}],162:[function(require,module,exports){
+},{"./analysis/main":157,"./main":178,"./syntax":180,"./transforms/cps":185,"./transforms/naming":187,"./transforms/optimize":188,"escodegen":27,"esprima":97,"fs":193,"underscore":151}],162:[function(require,module,exports){
 'use strict';
 var ad = require('./ad.js');
 var numeric = require('numeric');
 var _ = require('underscore');
 var util = require('./util');
 var assert = require('assert');
+var inspect = require('util').inspect;
 var LOG_PI = 1.1447298858494002;
 var LOG_2PI = 1.8378770664093453;
-function ERP(obj) {
-    assert(obj.sample && obj.score, 'ERP must implement sample and score.');
-    _.extendOwn(this, obj);
+function Distribution() {
 }
-ERP.prototype.isContinuous = false;
-ERP.prototype.MAP = function () {
-    if (this.isContinuous || !this.support) {
-        throw 'Can only compute MAP for ERPs with finite support.';
-    }
-    var supp = this.support([]);
-    var mapEst = {
-        val: undefined,
-        prob: 0
-    };
-    for (var i = 0, l = supp.length; i < l; i++) {
-        var sp = supp[i];
-        var sc = Math.exp(this.score([], sp));
-        if (sc > mapEst.prob)
-            mapEst = {
-                val: sp,
-                prob: sc
-            };
-    }
-    this.MAP = function () {
-        return mapEst;
-    };
-    return mapEst;
+Distribution.prototype = {
+    toJSON: function () {
+        throw new Error('Not implemented');
+    },
+    inspect: function (depth, options) {
+        if (_.has(this, 'params')) {
+            return [
+                this.meta.name,
+                '(',
+                inspect(this.params),
+                ')'
+            ].join('');
+        } else {
+            var opts = options ? _.clone(options) : {};
+            opts.customInspect = false;
+            return inspect(this, opts);
+        }
+    },
+    toString: function () {
+        return this.inspect();
+    },
+    isContinuous: false,
+    constructor: Distribution
 };
-ERP.prototype.entropy = function () {
-    if (this.isContinuous || !this.support) {
-        throw 'Can only compute entropy for ERPs with finite support.';
-    }
-    var supp = this.support([]);
-    var e = 0;
-    for (var i = 0, l = supp.length; i < l; i++) {
-        var lp = this.score([], supp[i]);
-        e -= Math.exp(lp) * lp;
-    }
-    this.entropy = function () {
-        return e;
-    };
-    return e;
+function isDist(x) {
+    return x instanceof Distribution;
+}
+function clone(dist) {
+    return new dist.constructor(dist.params);
+}
+var serialize = function (dist) {
+    return util.serialize(dist);
 };
-ERP.prototype.parameterized = true;
-ERP.prototype.withParameters = function (params) {
-    var erp = new ERP(this);
-    var sampler = this.sample;
-    erp.sample = function (ps) {
-        return sampler(params);
-    };
-    var scorer = this.score;
-    erp.score = function (ps, val) {
-        return scorer(params, val);
-    };
-    if (this.support) {
-        var support = this.support;
-        erp.support = function (ps) {
-            return support(params);
-        };
+var deserialize = function (JSONString) {
+    var obj = util.deserialize(JSONString);
+    if (!obj.probs || !obj.support) {
+        throw new Error('Cannot deserialize a non-distribution JSON object: ' + JSONString);
     }
-    erp.parameterized = false;
-    return erp;
+    return new Categorical({
+        ps: obj.probs,
+        vs: obj.support
+    });
 };
-ERP.prototype.isSerializeable = function () {
-    return !this.isContinuous && this.support && !this.parameterized;
-};
-ERP.prototype.toJSON = function () {
-    if (this.isSerializeable()) {
-        var support = this.support([]);
-        var probs = support.map(function (s) {
-            return Math.exp(this.score([], s));
+function isParams(x) {
+    return typeof x === 'object' && !Array.isArray(x) && !ad.isLifted(x) && x !== null;
+}
+var finiteSupport = {
+    MAP: function () {
+        var map = { score: -Infinity };
+        this.support().forEach(function (val) {
+            var score = this.score(val);
+            if (score > map.score) {
+                map = {
+                    val: val,
+                    score: score
+                };
+            }
         }, this);
-        var erpJSON = {
+        return map;
+    },
+    entropy: function () {
+        return _.reduce(this.support(), function (memo, x) {
+            var score = this.score(x);
+            return memo - (score === -Infinity ? 0 : Math.exp(score) * score);
+        }, 0, this);
+    },
+    toJSON: function () {
+        var support = this.support();
+        var probs = support.map(function (s) {
+            return Math.exp(this.score(s));
+        }, this);
+        return {
             probs: probs,
             support: support
         };
-        this.toJSON = function () {
-            return erpJSON;
+    }
+};
+var continuousSupport = { isContinuous: true };
+var methodNames = [
+    'sample',
+    'score',
+    'support',
+    'grad',
+    'print',
+    'driftKernel'
+];
+function makeDistributionType(options) {
+    options = util.mergeDefaults(options, {
+        parent: Distribution,
+        mixins: []
+    });
+    [
+        'name',
+        'params'
+    ].forEach(function (name) {
+        if (!_.has(options, name)) {
+            console.log(options);
+            throw new Error('makeDistributionType: ' + name + ' is required.');
+        }
+    });
+    if (options.score) {
+        var originalScoreFn = options.score;
+        options.score = function (val) {
+            if (arguments.length !== 1) {
+                throw new Error('The score method of ' + this.meta.name + ' expected 1 argument but received ' + arguments.length + '.');
+            }
+            return originalScoreFn.call(this, val);
         };
-        return erpJSON;
-    } else {
-        throw 'Cannot serialize ' + this.name + ' ERP.';
     }
-};
-ERP.prototype.print = function () {
-    if (this.isSerializeable()) {
-        console.log('ERP:');
-        var json = this.toJSON();
-        _.zip(json.probs, json.support).sort(function (a, b) {
-            return b[0] - a[0];
-        }).forEach(function (val) {
-            console.log('    ' + util.serialize(val[1]) + ' : ' + val[0]);
-        });
-    } else {
-        console.log('[ERP: ' + this.name + ']');
-    }
-};
-var serializeERP = function (erp) {
-    return util.serialize(erp);
-};
-var deserializeERP = function (JSONString) {
-    var obj = util.deserialize(JSONString);
-    if (!obj.probs || !obj.support) {
-        throw 'Cannot deserialize a non-ERP JSON object: ' + JSONString;
-    }
-    return makeCategoricalERP(obj.probs, obj.support, _.omit(obj, 'probs', 'support'));
-};
-var uniformERP = new ERP({
-    sample: function (params) {
+    var parameterNames = _.pluck(options.params, 'name');
+    var extraConstructorFn = options.constructor;
+    var dist = function (params) {
+        if (params === undefined) {
+            throw new Error('Parameters not supplied to ' + this.meta.name + ' distribution.');
+        }
+        parameterNames.forEach(function (p) {
+            if (!params.hasOwnProperty(p)) {
+                throw new Error('Parameter "' + p + '" missing from ' + this.meta.name + ' distribution.');
+            }
+        }, this);
+        this.params = params;
+        if (extraConstructorFn !== undefined) {
+            extraConstructorFn.call(this);
+        }
+    };
+    dist.prototype = Object.create(options.parent.prototype);
+    dist.prototype.constructor = dist;
+    dist.prototype.meta = _.pick(options, 'name', 'desc', 'params', 'internal');
+    _.extendOwn.apply(_, [dist.prototype].concat(options.mixins));
+    _.extendOwn(dist.prototype, _.pick(options, methodNames));
+    [
+        'sample',
+        'score'
+    ].forEach(function (method) {
+        if (!dist.prototype[method]) {
+            throw new Error('makeDistributionType: method "' + method + '" not defined for ' + options.name);
+        }
+    });
+    return dist;
+}
+var Uniform = makeDistributionType({
+    name: 'Uniform',
+    desc: 'Continuous uniform distribution on [a, b]',
+    params: [
+        { name: 'a' },
+        { name: 'b' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
         var u = util.random();
-        return (1 - u) * params[0] + u * params[1];
+        return (1 - u) * ad.value(this.params.a) + u * ad.value(this.params.b);
     },
-    score: function (params, val) {
-        if (ad.scalar.lt(val, params[0]) || ad.scalar.gt(val, params[1])) {
+    score: function (val) {
+        if (ad.scalar.lt(val, this.params.a) || ad.scalar.gt(val, this.params.b)) {
             return ad.scalar.sub(0, Infinity);
         }
-        return ad.scalar.sub(0, ad.scalar.log(ad.scalar.sub(params[1], params[0])));
+        return ad.scalar.sub(0, ad.scalar.log(ad.scalar.sub(this.params.b, this.params.a)));
     },
-    support: function (params) {
+    support: function () {
         return {
-            lower: params[0],
-            upper: params[1]
+            lower: this.params.a,
+            upper: this.params.b
         };
-    },
-    isContinuous: true
+    }
 });
-var bernoulliERP = new ERP({
-    sample: function (params) {
-        var weight = params[0];
-        var val = util.random() < weight;
-        return val;
+var UniformDrift = makeDistributionType({
+    name: 'UniformDrift',
+    params: [
+        { name: 'a' },
+        { name: 'b' },
+        {
+            name: 'r',
+            desc: 'drift kernel radius'
+        }
+    ],
+    parent: Uniform,
+    driftKernel: function (prevVal) {
+        var r = this.params.r === undefined ? 0.1 : this.params.r;
+        return new Uniform({
+            a: Math.max(prevVal - r, this.params.a),
+            b: Math.min(prevVal + r, this.params.b)
+        });
+    }
+});
+var Bernoulli = makeDistributionType({
+    name: 'Bernoulli',
+    desc: 'Distribution on {true,false}',
+    params: [{
+            name: 'p',
+            desc: 'probability of true'
+        }],
+    mixins: [finiteSupport],
+    sample: function () {
+        return util.random() < ad.value(this.params.p);
     },
-    score: function (params, val) {
+    score: function (val) {
         if (ad.scalar.pneq(val, true) && ad.scalar.pneq(val, false)) {
             return ad.scalar.sub(0, Infinity);
         }
-        var weight = params[0];
-        return val ? ad.scalar.log(weight) : ad.scalar.log(ad.scalar.sub(1, weight));
+        return val ? ad.scalar.log(this.params.p) : ad.scalar.log(ad.scalar.sub(1, this.params.p));
     },
-    support: function (params) {
+    support: function () {
         return [
             true,
             false
         ];
     },
-    grad: function (params, val) {
-        var weight = params[0];
-        return val ? [1 / weight] : [-1 / weight];
+    grad: function (val) {
+        return val ? [1 / this.params.p] : [-1 / this.params.p];
     }
 });
-var randomIntegerERP = new ERP({
-    sample: function (params) {
-        return Math.floor(util.random() * params[0]);
+var RandomInteger = makeDistributionType({
+    name: 'RandomInteger',
+    desc: 'Uniform distribution on {0,1,...,n-1}',
+    params: [{ name: 'n' }],
+    mixins: [finiteSupport],
+    sample: function () {
+        return Math.floor(util.random() * this.params.n);
     },
-    score: function (params, val) {
-        var stop = params[0];
-        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, stop);
-        return inSupport ? ad.scalar.sub(0, ad.scalar.log(stop)) : ad.scalar.sub(0, Infinity);
+    score: function (val) {
+        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, this.params.n);
+        return inSupport ? ad.scalar.sub(0, ad.scalar.log(this.params.n)) : ad.scalar.sub(0, Infinity);
     },
-    support: function (params) {
-        return _.range(params[0]);
+    support: function () {
+        return _.range(this.params.n);
     }
 });
-function gaussianSample(params) {
-    var mu = params[0];
-    var sigma = params[1];
+function gaussianSample(mu, sigma) {
     var u, v, x, y, q;
     do {
         u = 1 - util.random();
@@ -57433,78 +57897,126 @@ function gaussianSample(params) {
     } while (q >= 0.27597 && (q > 0.27846 || v * v > -4 * u * u * Math.log(u)));
     return mu + sigma * v / u;
 }
-function gaussianScore(params, x) {
-    var mu = params[0];
-    var sigma = params[1];
+function gaussianScore(mu, sigma, x) {
     return ad.scalar.mul(ad.scalar.sub(0, 0.5), ad.scalar.add(ad.scalar.add(LOG_2PI, ad.scalar.mul(2, ad.scalar.log(sigma))), ad.scalar.div(ad.scalar.mul(ad.scalar.sub(x, mu), ad.scalar.sub(x, mu)), ad.scalar.mul(sigma, sigma))));
 }
-var gaussianERP = new ERP({
-    sample: gaussianSample,
-    score: gaussianScore,
-    isContinuous: true
+var Gaussian = makeDistributionType({
+    name: 'Gaussian',
+    params: [
+        {
+            name: 'mu',
+            desc: 'mean'
+        },
+        {
+            name: 'sigma',
+            desc: 'standard deviation'
+        }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
+        return gaussianSample(ad.value(this.params.mu), ad.value(this.params.sigma));
+    },
+    score: function (x) {
+        return gaussianScore(this.params.mu, this.params.sigma, x);
+    }
 });
-function multivariateGaussianSample(params) {
-    var mu = params[0];
-    var cov = params[1];
+var GaussianDrift = makeDistributionType({
+    name: 'GaussianDrift',
+    params: [
+        {
+            name: 'mu',
+            desc: 'mean'
+        },
+        {
+            name: 'sigma',
+            desc: 'standard deviation'
+        }
+    ],
+    parent: Gaussian,
+    driftKernel: function (curVal) {
+        return new Gaussian({
+            mu: curVal,
+            sigma: this.params.sigma * 0.7
+        });
+    }
+});
+function multivariateGaussianSample(mu, cov) {
     var xs = mu.map(function () {
-        return gaussianSample([
-            0,
-            1
-        ]);
+        return gaussianSample(0, 1);
     });
     var svd = numeric.svd(cov);
-    var scaledV = numeric.transpose(svd.V).map(function (x) {
+    var scaledV = svd.V.map(function (x) {
         return numeric.mul(numeric.sqrt(svd.S), x);
     });
     xs = numeric.dot(xs, numeric.transpose(scaledV));
     return numeric.add(xs, mu);
 }
-function multivariateGaussianScore(params, x) {
-    var mu = params[0];
-    var cov = params[1];
+function multivariateGaussianScore(mu, cov, x) {
     var n = mu.length;
     var coeffs = n * LOG_2PI + Math.log(numeric.det(cov));
     var xSubMu = numeric.sub(x, mu);
     var exponents = numeric.dot(numeric.dot(xSubMu, numeric.inv(cov)), xSubMu);
     return -0.5 * (coeffs + exponents);
 }
-var multivariateGaussianERP = new ERP({
-    sample: multivariateGaussianSample,
-    score: multivariateGaussianScore,
-    isContinuous: false
+var MultivariateGaussian = makeDistributionType({
+    name: 'MultivariateGaussian',
+    params: [
+        {
+            name: 'mu',
+            desc: 'mean vector'
+        },
+        {
+            name: 'cov',
+            desc: 'covariance matrix'
+        }
+    ],
+    sample: function () {
+        return multivariateGaussianSample(this.params.mu, this.params.cov);
+    },
+    score: function (val) {
+        return multivariateGaussianScore(this.params.mu, this.params.cov, val);
+    }
 });
-var cauchyERP = new ERP({
-    sample: function (params) {
-        var location = params[0];
-        var scale = params[1];
+var Cauchy = makeDistributionType({
+    name: 'Cauchy',
+    params: [
+        { name: 'location' },
+        { name: 'scale' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
         var u = util.random();
-        return location + scale * Math.tan(180 * (u - 0.5));
+        return ad.value(this.params.location) + ad.value(this.params.scale) * Math.tan(180 * (u - 0.5));
     },
-    score: function (params, x) {
-        var location = params[0];
-        var scale = params[1];
+    score: function (x) {
+        var scale = this.params.scale;
+        var location = this.params.location;
         return ad.scalar.sub(ad.scalar.sub(ad.scalar.sub(0, LOG_PI), ad.scalar.log(scale)), ad.scalar.log(ad.scalar.add(1, ad.scalar.pow(ad.scalar.div(ad.scalar.sub(x, location), scale), 2))));
-    },
-    isContinuous: true
+    }
 });
 function sum(xs) {
     return xs.reduce(function (a, b) {
         return ad.scalar.add(a, b);
     }, 0);
 }
-;
-var discreteERP = new ERP({
-    sample: function (params) {
-        return discreteSample(params[0]);
+var Discrete = makeDistributionType({
+    name: 'Discrete',
+    desc: 'Distribution on {0,1,...,ps.length-1} with P(i) proportional to ps[i]',
+    params: [{
+            name: 'ps',
+            desc: 'array of probabilities'
+        }],
+    mixins: [finiteSupport],
+    sample: function () {
+        return discreteSample(this.params.ps.map(ad.value));
     },
-    score: function (params, val) {
-        var probs = params[0];
-        var stop = probs.length;
-        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, stop);
-        return inSupport ? ad.scalar.log(ad.scalar.div(probs[val], sum(probs))) : ad.scalar.sub(0, Infinity);
+    score: function (val) {
+        var n = this.params.ps.length;
+        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, n);
+        return inSupport ? ad.scalar.log(ad.scalar.div(this.params.ps[val], sum(this.params.ps))) : ad.scalar.sub(0, Infinity);
     },
     support: function (params) {
-        return _.range(params[0].length);
+        return _.range(this.params.ps.length);
     }
 });
 var gammaCof = [
@@ -57526,15 +58038,10 @@ function logGamma(xx) {
     }
     return ad.scalar.add(ad.scalar.sub(0, tmp), ad.scalar.log(ad.scalar.mul(2.5066282746310007, ser)));
 }
-function gammaSample(params) {
-    var shape = params[0];
-    var scale = params[1];
+function gammaSample(shape, scale) {
     if (shape < 1) {
         var r;
-        r = gammaSample([
-            1 + shape,
-            scale
-        ]) * Math.pow(util.random(), 1 / shape);
+        r = gammaSample(1 + shape, scale) * Math.pow(util.random(), 1 / shape);
         if (r === 0) {
             util.warn('gamma sample underflow, rounded to nearest representable support value');
             return Number.MIN_VALUE;
@@ -57546,10 +58053,7 @@ function gammaSample(params) {
     var c = 1 / Math.sqrt(9 * d);
     while (true) {
         do {
-            x = gaussianSample([
-                0,
-                1
-            ]);
+            x = gaussianSample(0, 1);
             v = 1 + c * x;
         } while (v <= 0);
         v = v * v * v;
@@ -57559,15 +58063,10 @@ function gammaSample(params) {
         }
     }
 }
-function expGammaSample(params) {
-    var shape = params[0];
-    var scale = params[1];
+function expGammaSample(shape, scale) {
     if (shape < 1) {
         var r;
-        r = gammaSample([
-            1 + shape,
-            scale
-        ]) + Math.log(util.random()) / shape;
+        r = gammaSample(1 + shape, scale) + Math.log(util.random()) / shape;
         if (r === -Infinity) {
             util.warn('log gamma sample underflow, rounded to nearest representable support value');
             return -Number.MAX_VALUE;
@@ -57579,10 +58078,7 @@ function expGammaSample(params) {
     var c = 1 / Math.sqrt(9 * d);
     while (true) {
         do {
-            x = gaussianSample([
-                0,
-                1
-            ]);
+            x = gaussianSample(0, 1);
             v = 1 + c * x;
         } while (v <= 0);
         log_v = 3 * Math.log(v);
@@ -57593,18 +58089,23 @@ function expGammaSample(params) {
         }
     }
 }
-function expGammaScore(params, val) {
-    var shape = params[0];
-    var scale = params[1];
+function expGammaScore(shape, scale, val) {
     var x = val;
     return ad.scalar.sub(ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(ad.scalar.sub(shape, 1), x), ad.scalar.div(ad.scalar.exp(x), scale)), logGamma(shape)), ad.scalar.mul(shape, ad.scalar.log(scale)));
 }
-var gammaERP = new ERP({
-    sample: gammaSample,
-    score: function (params, val) {
-        var shape = params[0];
-        var scale = params[1];
-        var x = val;
+var Gamma = makeDistributionType({
+    name: 'Gamma',
+    params: [
+        { name: 'shape' },
+        { name: 'scale' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
+        return gammaSample(ad.value(this.params.shape), ad.value(this.params.scale));
+    },
+    score: function (x) {
+        var shape = this.params.shape;
+        var scale = this.params.scale;
         return ad.scalar.sub(ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(ad.scalar.sub(shape, 1), ad.scalar.log(x)), ad.scalar.div(x, scale)), logGamma(shape)), ad.scalar.mul(shape, ad.scalar.log(scale)));
     },
     support: function () {
@@ -57612,48 +58113,45 @@ var gammaERP = new ERP({
             lower: 0,
             upper: Infinity
         };
-    },
-    isContinuous: true
+    }
 });
-var exponentialERP = new ERP({
-    sample: function (params) {
-        var a = params[0];
+var Exponential = makeDistributionType({
+    name: 'Exponential',
+    params: [{
+            name: 'a',
+            desc: 'rate'
+        }],
+    mixins: [continuousSupport],
+    sample: function () {
         var u = util.random();
-        return Math.log(u) / (-1 * a);
+        return Math.log(u) / (-1 * ad.value(this.params.a));
     },
-    score: function (params, val) {
-        var a = params[0];
-        return ad.scalar.sub(ad.scalar.log(a), ad.scalar.mul(a, val));
+    score: function (val) {
+        return ad.scalar.sub(ad.scalar.log(this.params.a), ad.scalar.mul(this.params.a, val));
     },
-    support: function (params) {
+    support: function () {
         return {
             lower: 0,
             upper: Infinity
         };
-    },
-    isContinuous: true
+    }
 });
 function logBeta(a, b) {
     return ad.scalar.sub(ad.scalar.add(logGamma(a), logGamma(b)), logGamma(ad.scalar.add(a, b)));
 }
-function betaSample(params) {
-    var a = params[0];
-    var b = params[1];
-    var x = gammaSample([
-        a,
-        1
-    ]);
-    return x / (x + gammaSample([
-        b,
-        1
-    ]));
-}
-var betaERP = new ERP({
-    sample: betaSample,
-    score: function (params, val) {
-        var a = params[0];
-        var b = params[1];
-        var x = val;
+var Beta = makeDistributionType({
+    name: 'Beta',
+    params: [
+        { name: 'a' },
+        { name: 'b' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
+        return betaSample(ad.value(this.params.a), ad.value(this.params.b));
+    },
+    score: function (x) {
+        var a = this.params.a;
+        var b = this.params.b;
         return ad.scalar.gt(x, 0) && ad.scalar.lt(x, 1) ? ad.scalar.sub(ad.scalar.add(ad.scalar.mul(ad.scalar.sub(a, 1), ad.scalar.log(x)), ad.scalar.mul(ad.scalar.sub(b, 1), ad.scalar.log(ad.scalar.sub(1, x)))), logBeta(a, b)) : ad.scalar.sub(0, Infinity);
     },
     support: function () {
@@ -57661,9 +58159,12 @@ var betaERP = new ERP({
             lower: 0,
             upper: 1
         };
-    },
-    isContinuous: true
+    }
 });
+function betaSample(a, b) {
+    var x = gammaSample(a, 1);
+    return x / (x + gammaSample(b, 1));
+}
 function binomialG(x) {
     if (ad.scalar.peq(x, 0)) {
         return 1;
@@ -57674,19 +58175,14 @@ function binomialG(x) {
     var d = ad.scalar.sub(1, x);
     return ad.scalar.div(ad.scalar.add(ad.scalar.sub(1, ad.scalar.mul(x, x)), ad.scalar.mul(ad.scalar.mul(2, x), ad.scalar.log(x))), ad.scalar.mul(d, d));
 }
-function binomialSample(params) {
-    var p = params[0];
-    var n = params[1];
+function binomialSample(p, n) {
     var k = 0;
     var N = 10;
     var a, b;
     while (n > N) {
-        a = 1 + n / 2;
+        a = Math.floor(1 + n / 2);
         b = 1 + n - a;
-        var x = betaSample([
-            a,
-            b
-        ]);
+        var x = betaSample(a, b);
         if (x >= p) {
             n = a - 1;
             p /= x;
@@ -57705,40 +58201,30 @@ function binomialSample(params) {
     }
     return k || 0;
 }
-var binomialERP = new ERP({
-    sample: binomialSample,
-    score: function (params, val) {
-        var p = params[0];
-        var n = params[1];
-        if (ad.scalar.gt(n, 20) && ad.scalar.gt(ad.scalar.mul(n, p), 5) && ad.scalar.gt(ad.scalar.mul(n, ad.scalar.sub(1, p)), 5)) {
-            var s = val;
-            var inv2 = ad.scalar.div(1, 2);
-            var inv3 = ad.scalar.div(1, 3);
-            var inv6 = ad.scalar.div(1, 6);
-            if (ad.scalar.geq(s, n)) {
-                return ad.scalar.sub(0, Infinity);
-            }
-            var q = ad.scalar.sub(1, p);
-            var S = ad.scalar.add(s, inv2);
-            var T = ad.scalar.sub(ad.scalar.sub(n, s), inv2);
-            var d1 = ad.scalar.sub(ad.scalar.add(s, inv6), ad.scalar.mul(ad.scalar.add(n, inv3), p));
-            var d2 = ad.scalar.add(ad.scalar.sub(ad.scalar.div(q, ad.scalar.add(s, inv2)), ad.scalar.div(p, ad.scalar.add(T, inv2))), ad.scalar.div(ad.scalar.sub(q, inv2), ad.scalar.add(n, 1)));
-            d2 = ad.scalar.add(d1, ad.scalar.mul(0.02, d2));
-            var num = ad.scalar.add(ad.scalar.add(1, ad.scalar.mul(q, binomialG(ad.scalar.div(S, ad.scalar.mul(n, p))))), ad.scalar.mul(p, binomialG(ad.scalar.div(T, ad.scalar.mul(n, q)))));
-            var den = ad.scalar.mul(ad.scalar.mul(ad.scalar.add(n, inv6), p), q);
-            var z = ad.scalar.div(num, den);
-            var invsd = ad.scalar.sqrt(z);
-            z = ad.scalar.mul(d2, invsd);
-            return ad.scalar.add(gaussianScore([
-                0,
-                1
-            ], z), ad.scalar.log(invsd));
-        } else {
-            return ad.scalar.add(ad.scalar.add(ad.scalar.sub(ad.scalar.sub(lnfact(n), lnfact(ad.scalar.sub(n, val))), lnfact(val)), ad.scalar.mul(val, ad.scalar.log(p))), ad.scalar.mul(ad.scalar.sub(n, val), ad.scalar.log(ad.scalar.sub(1, p))));
+var Binomial = makeDistributionType({
+    name: 'Binomial',
+    desc: 'Distribution over the number of successes for n independent ``Bernoulli({p: p})`` trials',
+    params: [
+        {
+            name: 'p',
+            desc: 'success probability'
+        },
+        {
+            name: 'n',
+            desc: 'number of trials'
         }
+    ],
+    mixins: [finiteSupport],
+    sample: function () {
+        return binomialSample(ad.value(this.params.p), this.params.n);
     },
-    support: function (params) {
-        return _.range(params[1]).concat([params[1]]);
+    score: function (val) {
+        var p = this.params.p;
+        var n = this.params.n;
+        return ad.scalar.add(ad.scalar.add(ad.scalar.sub(ad.scalar.sub(lnfact(n), lnfact(ad.scalar.sub(n, val))), lnfact(val)), ad.scalar.mul(val, ad.scalar.log(p))), ad.scalar.mul(ad.scalar.sub(n, val), ad.scalar.log(ad.scalar.sub(1, p))));
+    },
+    support: function () {
+        return _.range(this.params.n).concat(this.params.n);
     }
 });
 function zeros(n) {
@@ -57748,39 +58234,47 @@ function zeros(n) {
     }
     return a;
 }
-function multinomialSample(params) {
-    var theta = params[0];
-    var n = params[1];
-    var thetaSum = util.sum(theta);
+function multinomialSample(theta, n) {
     var a = zeros(theta.length);
     for (var i = 0; i < n; i++) {
         a[discreteSample(theta)]++;
     }
     return a;
 }
-var multinomialERP = new ERP({
-    sample: multinomialSample,
-    score: function (params, val) {
-        var probs = params[0];
-        var n = params[1];
-        if (sum(val) != n) {
-            return -Infinity;
+var Multinomial = makeDistributionType({
+    name: 'Multinomial',
+    desc: 'Distribution over counts for n independent ``Discrete({ps: ps})`` trials',
+    params: [
+        {
+            name: 'ps',
+            desc: 'probabilities'
+        },
+        {
+            name: 'n',
+            desc: 'number of trials'
+        }
+    ],
+    mixins: [finiteSupport],
+    sample: function () {
+        return multinomialSample(this.params.ps.map(ad.value), this.params.n);
+    },
+    score: function (val) {
+        if (ad.scalar.pneq(sum(val), this.params.n)) {
+            return ad.scalar.sub(0, Infinity);
         }
         var x = [];
         var y = [];
-        for (var i = 0; i < probs.length; i++) {
+        for (var i = 0; ad.scalar.lt(i, this.params.ps.length); i = ad.scalar.add(i, 1)) {
             x[i] = lnfact(val[i]);
-            y[i] = val[i] * Math.log(probs[i]);
+            y[i] = ad.scalar.mul(val[i], ad.scalar.log(this.params.ps[i]));
         }
-        return lnfact(n) - sum(x) + sum(y);
+        return ad.scalar.add(ad.scalar.sub(lnfact(this.params.n), sum(x)), sum(y));
     },
-    support: function (params) {
-        var probs = params[0];
-        var k = params[1];
-        var combinations = allDiscreteCombinations(k, probs, [], 0);
+    support: function () {
+        var combinations = allDiscreteCombinations(this.params.n, this.params.ps, [], 0);
         var toHist = function (l) {
-            return buildHistogramFromCombinations(l, probs);
-        };
+            return buildHistogramFromCombinations(l, this.params.ps);
+        }.bind(this);
         var hists = combinations.map(toHist);
         return hists;
     }
@@ -57837,21 +58331,17 @@ function lnfact(x) {
     sum = ad.scalar.add(sum, ad.scalar.sub(ad.scalar.div(invx5, 1260), ad.scalar.div(invx7, 1680)));
     return sum;
 }
-var poissonERP = new ERP({
-    sample: function (params) {
-        var mu = params[0];
+var Poisson = makeDistributionType({
+    name: 'Poisson',
+    params: [{ name: 'mu' }],
+    sample: function () {
         var k = 0;
+        var mu = ad.value(this.params.mu);
         while (mu > 10) {
             var m = 7 / 8 * mu;
-            var x = gammaSample([
-                m,
-                1
-            ]);
+            var x = gammaSample(m, 1);
             if (x > mu) {
-                return k + binomialSample([
-                    mu / x,
-                    m - 1
-                ]) || 0;
+                return k + binomialSample(mu / x, m - 1) || 0;
             } else {
                 mu -= x;
                 k += m;
@@ -57865,33 +58355,32 @@ var poissonERP = new ERP({
         } while (p > emu);
         return k - 1 || 0;
     },
-    score: function (params, val) {
-        var mu = params[0];
-        var k = val;
-        return ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(k, ad.scalar.log(mu)), mu), lnfact(k));
-    },
-    isContinuous: false
+    score: function (val) {
+        return ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(val, ad.scalar.log(this.params.mu)), this.params.mu), lnfact(val));
+    }
 });
-function dirichletSample(params) {
-    var alpha = params;
+function dirichletSample(alpha) {
+    var n = alpha.length;
     var ssum = 0;
     var theta = [];
     var t;
-    for (var i = 0; i < alpha.length; i++) {
-        t = gammaSample([
-            alpha[i],
-            1
-        ]);
+    for (var i = 0; i < n; i++) {
+        t = gammaSample(alpha[i], 1);
         theta[i] = t;
         ssum = ssum + t;
     }
-    for (var j = 0; j < theta.length; j++) {
+    for (var j = 0; j < n; j++) {
         theta[j] /= ssum;
+        if (theta[j] === 0) {
+            theta[j] = Number.EPSILON;
+        }
+        if (theta[j] === 1) {
+            theta[j] = 1 - Number.EPSILON;
+        }
     }
     return theta;
 }
-function dirichletScore(params, val) {
-    var alpha = params;
+function dirichletScore(alpha, val) {
     var theta = val;
     var asum = 0;
     for (var i = 0; i < alpha.length; i++) {
@@ -57904,10 +58393,33 @@ function dirichletScore(params, val) {
     }
     return logp;
 }
-var dirichletERP = new ERP({
-    sample: dirichletSample,
-    score: dirichletScore,
-    isContinuous: false
+var Dirichlet = makeDistributionType({
+    name: 'Dirichlet',
+    params: [{
+            name: 'alpha',
+            desc: 'array of concentration parameters'
+        }],
+    sample: function () {
+        return dirichletSample(this.params.alpha);
+    },
+    score: function (val) {
+        return dirichletScore(this.params.alpha, val);
+    }
+});
+var DirichletDrift = makeDistributionType({
+    name: 'DirichletDrift',
+    parent: Dirichlet,
+    params: [{
+            name: 'alpha',
+            desc: 'array of concentration parameters'
+        }],
+    driftKernel: function (prevVal) {
+        var concentration = 10;
+        var alpha = prevVal.map(function (x) {
+            return concentration * x;
+        });
+        return new Dirichlet({ alpha: alpha });
+    }
 });
 function discreteSample(theta) {
     var thetaSum = util.sum(theta);
@@ -57922,194 +58434,151 @@ function discreteSample(theta) {
     }
     return k - 1;
 }
-function makeMarginalERP(marginal) {
-    var norm = _.reduce(marginal, function (acc, obj) {
-        return ad.scalar.add(acc, obj.prob);
-    }, 0);
-    assert.ok(ad.scalar.lt(ad.scalar.abs(ad.scalar.sub(1, norm)), 1e-8), 'Expected marginal to be normalized.');
-    var support = _.map(marginal, function (obj) {
-        return obj.val;
-    });
-    return new ERP({
-        sample: function (params) {
-            var x = util.random();
-            var probAccum = 0;
-            for (var i in marginal) {
-                if (marginal.hasOwnProperty(i)) {
-                    probAccum = ad.scalar.add(probAccum, marginal[i].prob);
-                    if (ad.scalar.lt(x, probAccum)) {
-                        return marginal[i].val;
-                    }
+var Marginal = makeDistributionType({
+    name: 'Marginal',
+    internal: true,
+    params: [{ name: 'dist' }],
+    mixins: [finiteSupport],
+    constructor: function () {
+        var norm = _.reduce(this.params.dist, function (acc, obj) {
+            return ad.scalar.add(acc, obj.prob);
+        }, 0);
+        assert.ok(ad.scalar.lt(ad.scalar.abs(ad.scalar.sub(1, norm)), 1e-8), 'Expected marginal distribution to be normalized.');
+        this.supp = _.map(this.params.dist, function (obj) {
+            return obj.val;
+        });
+    },
+    sample: function () {
+        var x = util.random();
+        var dist = this.params.dist;
+        var probAccum = 0;
+        for (var i in dist) {
+            if (dist.hasOwnProperty(i)) {
+                probAccum = ad.scalar.add(probAccum, dist[i].prob);
+                if (ad.scalar.lt(x, probAccum)) {
+                    return dist[i].val;
                 }
             }
-            return marginal[i].val;
+        }
+        return this.params.dist[i].val;
+    },
+    score: function (val) {
+        var obj = this.params.dist[util.serialize(val)];
+        return obj ? ad.scalar.log(obj.prob) : ad.scalar.sub(0, Infinity);
+    },
+    support: function () {
+        return this.supp;
+    },
+    print: function () {
+        return _.map(this.params.dist, function (obj, val) {
+            return [
+                val,
+                obj.prob
+            ];
+        }).sort(function (a, b) {
+            return b[1] - a[1];
+        }).map(function (pair) {
+            return '    ' + pair[0] + ' : ' + pair[1];
+        }).join('\n');
+    }
+});
+var Categorical = makeDistributionType({
+    name: 'Categorical',
+    desc: 'Distribution over elements of vs with P(vs[i]) = ps[i]',
+    params: [
+        {
+            name: 'ps',
+            desc: 'array of probabilities'
         },
-        score: function (params, val) {
-            var obj = marginal[util.serialize(val)];
-            return obj ? ad.scalar.log(obj.prob) : ad.scalar.sub(0, Infinity);
-        },
-        support: function (params) {
-            return support;
-        },
-        parameterized: false,
-        name: 'marginal',
-        hist: marginal
-    });
-}
-var makeCategoricalERP = function (ps, vs, extraParams) {
-    var dist = {};
-    vs.forEach(function (v, i) {
-        dist[util.serialize(v)] = {
-            val: v,
-            prob: ps[i]
-        };
-    });
-    var categoricalSample = vs.length === 1 ? function (params) {
-        return vs[0];
-    } : function (params) {
+        {
+            name: 'vs',
+            desc: 'support'
+        }
+    ],
+    mixins: [finiteSupport],
+    constructor: function () {
+        this.dist = _.object(this.params.vs.map(function (v, i) {
+            return [
+                util.serialize(v),
+                {
+                    val: v,
+                    prob: this.params.ps[i]
+                }
+            ];
+        }, this));
+    },
+    sample: function () {
+        var vs = this.params.vs.map(ad.value);
+        var ps = this.params.ps.map(ad.value);
         return vs[discreteSample(ps)];
-    };
-    return new ERP(_.extendOwn({
-        sample: categoricalSample,
-        score: function (params, val) {
-            var lk = dist[util.serialize(val)];
-            return lk ? ad.scalar.log(lk.prob) : ad.scalar.sub(0, Infinity);
-        },
-        support: function (params) {
-            return vs;
-        },
-        parameterized: false,
-        name: 'categorical'
-    }, extraParams));
-};
-var makeMultiplexERP = function (vs, erps) {
-    var stringifiedVals = vs.map(util.serialize);
-    var selectERP = function (params) {
-        var stringifiedV = util.serialize(params[0]);
-        var i = _.indexOf(stringifiedVals, stringifiedV);
-        if (i === -1) {
-            return undefined;
-        } else {
-            return erps[i];
-        }
-    };
-    return new ERP({
-        sample: function (params) {
-            var erp = selectERP(params);
-            assert.notEqual(erp, undefined);
-            return erp.sample();
-        },
-        score: function (params, val) {
-            var erp = selectERP(params);
-            if (ad.scalar.peq(erp, undefined)) {
-                return ad.scalar.sub(0, Infinity);
-            } else {
-                return erp.score([], val);
-            }
-        },
-        support: function (params) {
-            var erp = selectERP(params);
-            return erp.support();
-        },
-        name: 'multiplex'
-    });
-};
-function gaussianProposalParams(params, prevVal) {
-    var mu = prevVal;
-    var sigma = params[1] * 0.7;
-    return [
-        mu,
-        sigma
-    ];
-}
-function dirichletProposalParams(params, prevVal) {
-    var concentration = 10;
-    var driftParams = prevVal.map(function (x) {
-        return concentration * x;
-    });
-    return driftParams;
-}
-function buildProposer(baseERP, getProposalParams) {
-    return new ERP({
-        sample: function (params) {
-            var baseParams = params[0];
-            var prevVal = params[1];
-            var proposalParams = getProposalParams(baseParams, prevVal);
-            return baseERP.sample(proposalParams);
-        },
-        score: function (params, val) {
-            var baseParams = params[0];
-            var prevVal = params[1];
-            var proposalParams = getProposalParams(baseParams, prevVal);
-            return baseERP.score(proposalParams, val);
-        },
-        isContinuous: true
-    });
-}
-var gaussianProposerERP = buildProposer(gaussianERP, gaussianProposalParams);
-var dirichletProposerERP = buildProposer(dirichletERP, dirichletProposalParams);
-var gaussianDriftERP = new ERP({
-    sample: gaussianERP.sample,
-    score: gaussianERP.score,
-    proposer: gaussianProposerERP,
-    isContinuous: true
+    },
+    score: function (val) {
+        var obj = this.dist[util.serialize(val)];
+        return obj ? ad.scalar.log(obj.prob) : ad.scalar.sub(0, Infinity);
+    },
+    support: function () {
+        return this.params.vs;
+    }
 });
-var dirichletDriftERP = new ERP({
-    sample: dirichletERP.sample,
-    score: dirichletERP.score,
-    proposer: dirichletProposerERP,
-    isContinuous: false
+var Delta = makeDistributionType({
+    name: 'Delta',
+    desc: 'Discrete distribution that assigns probability one to the single ' + 'element in its support. This is only useful in special circumstances as sampling ' + 'from ``Delta({v: val})`` can be replaced with ``val`` itself. Furthermore, a ``Delta`` ' + 'distribution parameterized by a random choice should not be used with MCMC based inference, ' + 'as doing so produces incorrect results.',
+    params: [{
+            name: 'v',
+            desc: 'support element'
+        }],
+    mixins: [finiteSupport],
+    constructor: function () {
+        this.v = util.serialize(this.params.v);
+    },
+    sample: function () {
+        return ad.value(this.params.v);
+    },
+    score: function (val) {
+        return util.serialize(val) === this.v ? 0 : -Infinity;
+    },
+    support: function () {
+        return [this.params.v];
+    }
 });
-function withImportanceDist(s, k, a, erp, importanceERP) {
-    var newERP = _.clone(erp);
-    newERP.importanceERP = importanceERP;
-    return k(s, newERP);
+function withImportanceDist(dist, importanceDist) {
+    var newDist = clone(dist);
+    newDist.importanceDist = importanceDist;
+    return newDist;
 }
-function isErp(x) {
-    return x && _.isFunction(x.score) && _.isFunction(x.sample);
-}
-function isErpWithSupport(x) {
-    return isErp(x) && _.isFunction(x.support);
-}
-function setErpNames(exports) {
-    return _.each(exports, function (val, key) {
-        if (isErp(val)) {
-            val.name = key.replace(/ERP$/, '');
-        }
-    });
-}
-module.exports = setErpNames({
-    ERP: ERP,
-    serializeERP: serializeERP,
-    deserializeERP: deserializeERP,
-    bernoulliERP: bernoulliERP,
-    betaERP: betaERP,
-    binomialERP: binomialERP,
-    dirichletERP: dirichletERP,
-    discreteERP: discreteERP,
-    multinomialERP: multinomialERP,
-    exponentialERP: exponentialERP,
-    gammaERP: gammaERP,
-    gaussianERP: gaussianERP,
+module.exports = {
+    Uniform: Uniform,
+    UniformDrift: UniformDrift,
+    Bernoulli: Bernoulli,
+    RandomInteger: RandomInteger,
+    Gaussian: Gaussian,
+    GaussianDrift: GaussianDrift,
+    MultivariateGaussian: MultivariateGaussian,
+    Cauchy: Cauchy,
+    Discrete: Discrete,
+    Gamma: Gamma,
+    Exponential: Exponential,
+    Beta: Beta,
+    Binomial: Binomial,
+    Multinomial: Multinomial,
+    Poisson: Poisson,
+    Dirichlet: Dirichlet,
+    DirichletDrift: DirichletDrift,
+    Marginal: Marginal,
+    Categorical: Categorical,
+    Delta: Delta,
+    binomialSample: binomialSample,
     discreteSample: discreteSample,
-    multinomialSample: multinomialSample,
-    multivariateGaussianERP: multivariateGaussianERP,
-    cauchyERP: cauchyERP,
-    poissonERP: poissonERP,
-    randomIntegerERP: randomIntegerERP,
-    uniformERP: uniformERP,
-    makeMarginalERP: makeMarginalERP,
-    makeCategoricalERP: makeCategoricalERP,
-    makeMultiplexERP: makeMultiplexERP,
-    gaussianDriftERP: gaussianDriftERP,
-    dirichletDriftERP: dirichletDriftERP,
-    gaussianProposerERP: gaussianProposerERP,
-    dirichetProposerERP: dirichletProposerERP,
+    gaussianSample: gaussianSample,
+    gammaSample: gammaSample,
+    dirichletSample: dirichletSample,
+    serialize: serialize,
+    deserialize: deserialize,
     withImportanceDist: withImportanceDist,
-    isErp: isErp,
-    isErpWithSupport: isErpWithSupport
-});
-},{"./ad.js":152,"./util":190,"assert":192,"numeric":109,"underscore":151}],163:[function(require,module,exports){
+    isDist: isDist,
+    isParams: isParams
+};
+},{"./ad.js":152,"./util":192,"assert":194,"numeric":109,"underscore":151,"util":408}],163:[function(require,module,exports){
 /**
  * @license jahashtable, a JavaScript implementation of a hash table. It creates a single constructor function called
  * Hashtable in the global scope.
@@ -58551,8 +59020,8 @@ module.exports = {
 //
 // An inference function takes the current continuation and a WebPPL
 // thunk (which itself has been transformed to take a
-// continuation). It does some kind of inference and returns an ERP
-// representing the nromalized marginal distribution on return values.
+// continuation). It does some kind of inference and returns a distribution
+// representing the normalized marginal distribution on return values.
 //
 // The inference function should install a coroutine object that
 // provides sample, factor, and exit.
@@ -58571,7 +59040,7 @@ var _ = require('underscore');
 
 try {
   var util = require('./util');
-  var erp = require('./erp');
+  var dists = require('./dists');
   var enumerate = require('./inference/enumerate');
   var mcmc = require('./inference/mcmc');
   var asyncpf = require('./inference/asyncpf');
@@ -58599,11 +59068,11 @@ module.exports = function(env) {
   // Inference interface
 
   env.coroutine = {
-    sample: function(s, k, a, erp, params) {
-      return k(s, erp.sample(params));
+    sample: function(s, k, a, dist) {
+      return k(s, dist.sample());
     },
     factor: function() {
-      throw 'factor allowed only inside inference.';
+      throw new Error('factor allowed only inside inference.');
     },
     exit: function(s, r) {
       return r;
@@ -58616,8 +59085,11 @@ module.exports = function(env) {
 
   env.defaultCoroutine = env.coroutine;
 
-  env.sample = function(s, k, a, erp, params) {
-    return env.coroutine.sample(s, k, a, erp, params);
+  env.sample = function(s, k, a, dist) {
+    if (!dists.isDist(dist)) {
+      throw new Error('sample() expected a distribution but received \"' + JSON.stringify(dist) + '\".');
+    }
+    return env.coroutine.sample(s, k, a, dist);
   };
 
   env.factor = function(s, k, a, score) {
@@ -58625,9 +59097,9 @@ module.exports = function(env) {
     return env.coroutine.factor(s, k, a, score);
   };
 
-  env.sampleWithFactor = function(s, k, a, erp, params, scoreFn) {
+  env.sampleWithFactor = function(s, k, a, dist, scoreFn) {
     if (typeof env.coroutine.sampleWithFactor === 'function') {
-      return env.coroutine.sampleWithFactor(s, k, a, erp, params, scoreFn);
+      return env.coroutine.sampleWithFactor(s, k, a, dist, scoreFn);
     } else {
       var sampleK = function(s, v) {
         var scoreK = function(s, sc) {
@@ -58638,7 +59110,7 @@ module.exports = function(env) {
         };
         return scoreFn(s, scoreK, a + 'swf1', v);
       };
-      return env.sample(s, sampleK, a, erp, params);
+      return env.sample(s, sampleK, a, dist);
     }
   };
 
@@ -58679,7 +59151,8 @@ module.exports = function(env) {
     _: _,
     util: util,
     assert: assert,
-    ad: ad
+    ad: ad,
+    dists: dists
   });
 
   // Inference functions and header utils
@@ -58691,15 +59164,12 @@ module.exports = function(env) {
     addExports(mod(env));
   });
 
-  // Random primitives
-  addExports(erp);
-
   return exports;
 
 };
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./ad":152,"./erp":162,"./headerUtils":165,"./inference/asyncpf":166,"./inference/enumerate":167,"./inference/incrementalmh":169,"./inference/mcmc":172,"./inference/pmcmc":174,"./inference/rejection":175,"./inference/smc":176,"./inference/variational":177,"./query":179,"./util":190,"_process":389,"assert":192,"underscore":151}],165:[function(require,module,exports){
+},{"./ad":152,"./dists":162,"./headerUtils":165,"./inference/asyncpf":166,"./inference/enumerate":167,"./inference/incrementalmh":169,"./inference/mcmc":172,"./inference/pmcmc":174,"./inference/rejection":175,"./inference/smc":176,"./inference/variational":177,"./query":179,"./util":192,"_process":391,"assert":194,"underscore":151}],165:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -58775,7 +59245,7 @@ module.exports = function(env) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./ad":152,"./util":190,"lru-cache":105}],166:[function(require,module,exports){
+},{"./ad":152,"./util":192,"lru-cache":105}],166:[function(require,module,exports){
 ////////////////////////////////////////////////////////////////////
 // Asynchronous Anytime SMC.
 // http://arxiv.org/abs/1407.2864
@@ -58786,7 +59256,7 @@ module.exports = function(env) {
 
 var _ = require('underscore');
 var util = require('../util');
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 
 module.exports = function(env) {
 
@@ -58816,9 +59286,10 @@ module.exports = function(env) {
     };
   }
 
-  function AsyncPF(s, k, a, wpplFn, numParticles, bufferSize) {
+  function AsyncPF(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'AsyncPF');
     this.numParticles = 0;      // K_0 -- initialized here, set in run
-    this.bufferSize = bufferSize == undefined ? numParticles : bufferSize; // \rho
+    this.bufferSize = options.bufferSize == undefined ? options.particles : options.bufferSize; // \rho
     this.initNumParticles = Math.floor(this.bufferSize * (1 / 2));         // \rho_0
     this.exitK = function(s) {return wpplFn(s, env.exit, a);};
     this.store = s;
@@ -58829,7 +59300,7 @@ module.exports = function(env) {
 
     this.obsWeights = {};
     this.exitedParticles = 0;
-    this.hist = new Histogram();
+    this.hist = new CountAggregator();
 
     // Move old coroutine out of the way and install this as current handler.
     this.k = k;
@@ -58861,8 +59332,8 @@ module.exports = function(env) {
     return p.continuation(p.store);
   };
 
-  AsyncPF.prototype.sample = function(s, cc, a, erp, params) {
-    return cc(s, erp.sample(params));
+  AsyncPF.prototype.sample = function(s, cc, a, dist) {
+    return cc(s, dist.sample());
   };
 
   AsyncPF.prototype.factor = function(s, cc, a, score) {
@@ -58894,7 +59365,7 @@ module.exports = function(env) {
       var prevWBar = lk[lk.length - 1].wbar;
       var wbar = -Math.log(denom) + util.logsumexp([Math.log(lk.length) + prevWBar,
                                                     Math.log(currMultiplicity) + currWeight]);
-      if (wbar > 0) throw 'Positive weight!!'; // sanity check
+      if (wbar > 0) throw new Error('Positive weight!!'); // sanity check
       var logRatio = currWeight - wbar;
       var numChildrenAndWeight = [];
 
@@ -58946,7 +59417,7 @@ module.exports = function(env) {
     if (this.exitedParticles < this.numParticles) {
       return this.run();
     } else {
-      var dist = this.hist.toERP();
+      var dist = this.hist.toDist();
 
       var lastFactorIndex = this.activeParticle.factorIndex;
       var olk = this.obsWeights[lastFactorIndex];
@@ -58974,8 +59445,9 @@ module.exports = function(env) {
 
   AsyncPF.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  function asyncPF(s, cc, a, wpplFn, numParticles, bufferSize) {
-    return new AsyncPF(s, cc, a, wpplFn, numParticles, bufferSize).run(numParticles);
+  function asyncPF(s, cc, a, wpplFn, options) {
+    options = options || {};
+    return new AsyncPF(s, cc, a, wpplFn, options).run(options.particles);
   }
 
   return {
@@ -58984,24 +59456,27 @@ module.exports = function(env) {
 
 };
 
-},{"../aggregation/histogram":154,"../util":190,"underscore":151}],167:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../util":192,"underscore":151}],167:[function(require,module,exports){
 'use strict';
 var ad = require('../ad.js');
 var _ = require('underscore');
 var PriorityQueue = require('priorityqueuejs');
 var util = require('../util');
-var Distribution = require('../aggregation/distribution');
+var ScoreAggregator = require('../aggregation/ScoreAggregator');
 module.exports = function (env) {
-    function Enumerate(store, k, a, wpplFn, maxExecutions, Q) {
+    function Enumerate(store, k, a, wpplFn, options) {
+        util.throwUnlessOpts(options, 'Enumerate');
+        options = util.mergeDefaults(options, { maxExecutions: Infinity });
+        this.maxExecutions = options.maxExecutions;
         this.score = 0;
-        this.marginal = new Distribution();
+        this.marginal = new ScoreAggregator();
         this.numCompletedExecutions = 0;
         this.store = store;
         this.k = k;
         this.a = a;
         this.wpplFn = wpplFn;
-        this.maxExecutions = maxExecutions || Infinity;
-        this.queue = Q;
+        var strategy = strategies[options.strategy] || defaultStrategy(options.maxExecutions);
+        this.queue = strategy.makeQ();
         this.coroutine = env.coroutine;
         env.coroutine = this;
     }
@@ -59022,22 +59497,22 @@ module.exports = function (env) {
         };
         this.queue.enq(state);
     };
-    var getSupport = function (erp, params) {
-        if (erp.isContinuous || !erp.support) {
-            console.error(erp, params);
-            throw 'Enumerate can only be used with ERPs that have finite support.';
+    var getSupport = function (dist) {
+        if (dist.isContinuous || !dist.support) {
+            console.error(dist);
+            throw new Error('Enumerate can only be used with distributions that have finite support.');
         }
-        var supp = erp.support(params);
+        var supp = dist.support();
         if (ad.scalar.peq(supp.length, 0)) {
-            console.error(erp, params);
-            throw 'Enumerate encountered ERP with empty support!';
+            console.error(dist);
+            throw new Error('Enumerate encountered a distribution with empty support!');
         }
         return supp;
     };
-    Enumerate.prototype.sample = function (store, k, a, erp, params) {
-        var support = getSupport(erp, params);
+    Enumerate.prototype.sample = function (store, k, a, dist) {
+        var support = getSupport(dist);
         _.each(support, function (value) {
-            this.enqueueContinuation(k, value, ad.scalar.add(this.score, erp.score(params, value)), store);
+            this.enqueueContinuation(k, value, ad.scalar.add(this.score, dist.score(value)), store);
         }, this);
         return this.nextInQueue();
     };
@@ -59048,11 +59523,11 @@ module.exports = function (env) {
         }
         return k(s);
     };
-    Enumerate.prototype.sampleWithFactor = function (store, k, a, erp, params, scoreFn) {
-        var support = getSupport(erp, params);
+    Enumerate.prototype.sampleWithFactor = function (store, k, a, dist, scoreFn) {
+        var support = getSupport(dist);
         return util.cpsForEach(function (value, i, support$2, nextK) {
             return scoreFn(store, function (store$2, extraScore) {
-                var score = ad.scalar.add(ad.scalar.add(env.coroutine.score, erp.score(params, value)), extraScore);
+                var score = ad.scalar.add(ad.scalar.add(env.coroutine.score, dist.score(value)), extraScore);
                 env.coroutine.enqueueContinuation(k, value, score, store$2);
                 return nextK();
             }, a, value);
@@ -59067,49 +59542,54 @@ module.exports = function (env) {
             return this.nextInQueue();
         } else {
             if (ad.scalar.peq(this.marginal.size, 0)) {
-                throw 'All paths explored by Enumerate have probability zero.';
+                throw new Error('All paths explored by Enumerate have probability zero.');
             }
             env.coroutine = this.coroutine;
-            return this.k(this.store, this.marginal.toERP());
+            return this.k(this.store, this.marginal.toDist());
         }
     };
     Enumerate.prototype.incrementalize = env.defaultCoroutine.incrementalize;
-    function enuPriority(s, k, a, wpplFn, maxExecutions) {
-        var q = new PriorityQueue(function (a$2, b) {
-            return ad.scalar.sub(a$2.score, b.score);
-        });
-        return new Enumerate(s, k, a, wpplFn, maxExecutions, q).run();
-    }
-    function enuFilo(s, k, a, wpplFn, maxExecutions) {
-        var q = [];
-        q.size = function () {
-            return q.length;
-        };
-        q.enq = q.push;
-        q.deq = q.pop;
-        return new Enumerate(s, k, a, wpplFn, maxExecutions, q).run();
-    }
-    function enuFifo(s, k, a, wpplFn, maxExecutions) {
-        var q = [];
-        q.size = function () {
-            return q.length;
-        };
-        q.enq = q.push;
-        q.deq = q.shift;
-        return new Enumerate(s, k, a, wpplFn, maxExecutions, q).run();
-    }
-    function enuDefault(s, k, a, wpplFn, maxExecutions) {
-        var enu = _.isFinite(maxExecutions) ? enuPriority : enuFilo;
-        return enu(s, k, a, wpplFn, maxExecutions);
+    var strategies = {
+        'likelyFirst': {
+            makeQ: function () {
+                return new PriorityQueue(function (a, b) {
+                    return ad.scalar.sub(a.score, b.score);
+                });
+            }
+        },
+        'depthFirst': {
+            makeQ: function () {
+                var q = [];
+                q.size = function () {
+                    return q.length;
+                };
+                q.enq = q.push;
+                q.deq = q.pop;
+                return q;
+            }
+        },
+        'breadthFirst': {
+            makeQ: function () {
+                var q = [];
+                q.size = function () {
+                    return q.length;
+                };
+                q.enq = q.push;
+                q.deq = q.shift;
+                return q;
+            }
+        }
+    };
+    function defaultStrategy(maxExecutions) {
+        return strategies[_.isFinite(maxExecutions) ? 'likelyFirst' : 'depthFirst'];
     }
     return {
-        Enumerate: enuDefault,
-        EnumerateBreadthFirst: enuFifo,
-        EnumerateDepthFirst: enuFilo,
-        EnumerateLikelyFirst: enuPriority
+        Enumerate: function (s, k, a, wpplFn, options) {
+            return new Enumerate(s, k, a, wpplFn, options).run();
+        }
     };
 };
-},{"../ad.js":152,"../aggregation/distribution":153,"../util":190,"priorityqueuejs":110,"underscore":151}],168:[function(require,module,exports){
+},{"../ad.js":152,"../aggregation/ScoreAggregator":155,"../util":192,"priorityqueuejs":110,"underscore":151}],168:[function(require,module,exports){
 // Neal, Radford M. "MCMC using Hamiltonian dynamics." Handbook of
 // Markov Chain Monte Carlo 2 (2011).
 // http://arxiv.org/abs/1206.1901
@@ -59119,13 +59599,13 @@ module.exports = function (env) {
 var _ = require('underscore');
 var assert = require('assert');
 var util = require('../util');
-var erp = require('../erp');
+var dists = require('../dists');
 var Trace = require('../trace');
 var ad = require('../ad');
 
 module.exports = function(env) {
 
-  var mvErpNames = ['multivariateGaussian', 'dirichlet', 'dirichletDrift'];
+  var mvDistNames = ['MultivariateGaussian', 'Dirichlet', 'DirichletDrift'];
 
   function HMCKernel(cont, oldTrace, options) {
     var options = util.mergeDefaults(options, {
@@ -59147,20 +59627,20 @@ module.exports = function(env) {
     env.coroutine = this;
   }
 
-  HMCKernel.prototype.sample = function(s, k, a, erp, params) {
+  HMCKernel.prototype.sample = function(s, k, a, dist) {
     var prevChoice = this.prevTrace.findChoice(a);
     if (!prevChoice) {
-      throw 'HMC does not support structural continuous variables.';
+      throw new Error('HMC does not support structural continuous variables.');
     }
 
     var val;
-    if (erp.isContinuous) {
+    if (dist.isContinuous) {
       var prevVal = ad.value(prevChoice.val);
       var _val = prevVal + this.stepSize * this.momentum[a];
 
       // Handle constraints.
-      if (erp.support) {
-        var support = erp.support(params);
+      if (dist.support) {
+        var support = dist.support();
         var lower = support.lower;
         var upper = support.upper;
 
@@ -59177,13 +59657,13 @@ module.exports = function(env) {
       }
       val = ad.lift(_val);
     } else {
-      if (_.contains(mvErpNames, erp.name)) {
-        throw 'Multivariate distributions are not yet supported by HMC.';
+      if (_.contains(mvDistNames, dist.meta.name)) {
+        throw new Error('Multivariate distributions are not yet supported by HMC.');
       }
       val = prevChoice.val;
     }
 
-    this.trace.addChoice(erp, params, val, a, s, k);
+    this.trace.addChoice(dist, val, a, s, k);
     return k(s, val);
   };
 
@@ -59243,8 +59723,8 @@ module.exports = function(env) {
   function sampleMomentum(trace) {
     var momentum = {};
     _.each(trace.choices, function(choice) {
-      if (choice.erp.isContinuous) {
-        momentum[choice.address] = erp.gaussianERP.sample([0, 1]);
+      if (choice.dist.isContinuous) {
+        momentum[choice.address] = dists.gaussianSample(0, 1);
       }
     });
     return momentum;
@@ -59262,6 +59742,7 @@ module.exports = function(env) {
     // variables.
     this.prevTrace = trace;
     this.trace = this.prevTrace.fresh();
+
     // Once the WebPPL program has finished we need to call cont to
     // continue inference. Since the program will call env.exit once
     // finished, we save cont here in order to resume inference as
@@ -59270,6 +59751,8 @@ module.exports = function(env) {
     // stored as part of the trace, and when invoked by a different
     // MCMC kernel execution would jump back here.
     this.positionStepCont = cont;
+
+    env.query.clear();
     return this.trace.continue();
   };
 
@@ -59294,7 +59777,7 @@ module.exports = function(env) {
 
       var stepSize = this.stepSize * scaleFactor;
       _.each(trace.choices, function(choice) {
-        if (choice.erp.isContinuous) {
+        if (choice.dist.isContinuous) {
           this.momentum[choice.address] += stepSize * ad.derivative(choice.val);
         }
       }, this);
@@ -59331,7 +59814,7 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../erp":162,"../trace":181,"../util":190,"assert":192,"underscore":151}],169:[function(require,module,exports){
+},{"../ad":152,"../dists":162,"../trace":181,"../util":192,"assert":194,"underscore":151}],169:[function(require,module,exports){
 (function (global){
 ////////////////////////////////////////////////////////////////////
 // Incrementalized (i.e. caching) Lightweight MH
@@ -59343,8 +59826,8 @@ var assert = require('assert');
 var util = require('../util');
 var Hashtable = require('../hashtable').Hashtable
 var Query = require('../query').Query;
-var Histogram = require('../aggregation/histogram');
-var MAP = require('../aggregation/map');
+var CountAggregator = require('../aggregation/CountAggregator');
+var MaxAggregator = require('../aggregation/MaxAggregator');
 
 module.exports = function(env) {
 
@@ -59406,14 +59889,14 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  // A cached ERP call
-  function ERPNode(coroutine, parent, s, k, a, erp, params) {
+  // A cached distribution call
+  function DistNode(coroutine, parent, s, k, a, dist) {
     this.coroutine = coroutine;
 
     this.store = _.clone(s);
     this.continuation = k;
     this.address = a;
-    this.erp = erp;
+    this.dist = dist;
 
     this.parent = parent;
     this.depth = parent.depth + 1;
@@ -59422,32 +59905,31 @@ module.exports = function(env) {
     this.reachable = true;
     this.needsUpdate = false;
 
-    this.params = params;
-    this.val = erp.sample(params);
+    this.val = dist.sample();
     this.score = 0; this.rescore();
 
-    // Add this to the master list of ERP nodes
-    this.coroutine.addERP(this);
+    // Add this to the master list of distribution nodes
+    this.coroutine.addDist(this);
   }
 
-  ERPNode.prototype.print = function() {
-    tabbedlog(0, this.depth, 'ERPNode', this.erp.sample.name.slice(0, -6),
-              this.params, this.val, this.reachable ? '' : '!!UNREACHABLE!!');
+  DistNode.prototype.print = function() {
+    tabbedlog(0, this.depth, 'DistNode', this.dist,
+              this.val, this.reachable ? '' : '!!UNREACHABLE!!');
   };
 
-  ERPNode.prototype.execute = function() {
-    tabbedlog(4, this.depth, 'execute ERP');
+  DistNode.prototype.execute = function() {
+    tabbedlog(4, this.depth, 'execute distribution');
     if (this.needsUpdate) {
-      tabbedlog(4, this.depth, 'yes, ERP params changed');
-      tabbedlog(5, this.depth, 'old params:',
-          this.__snapshot ? this.__snapshot.params : undefined,
-          'new params:', this.params);
+      tabbedlog(4, this.depth, 'yes, dist changed');
+      tabbedlog(5, this.depth, 'old dist:',
+          this.__snapshot ? this.__snapshot.dist : undefined,
+          'new dist:', this.dist);
       this.needsUpdate = false;
       this.rescore();
     }
     else {
-      tabbedlog(4, this.depth, 'no, ERP params have not changed');
-      tabbedlog(5, this.depth, 'params:', this.params);
+      tabbedlog(4, this.depth, 'no, dist has not changed');
+      tabbedlog(5, this.depth, 'dist:', this.dist);
     }
     // Bail out early if we know proposal will be rejected
     if (this.score === -Infinity) {
@@ -59458,40 +59940,33 @@ module.exports = function(env) {
     }
   };
 
-  ERPNode.prototype.registerInputChanges = function(s, k, erp, params) {
+  DistNode.prototype.registerInputChanges = function(s, k, dist) {
     updateProperty(this, 'store', _.clone(s));
     updateProperty(this, 'continuation', k);
     updateProperty(this, 'index', this.parent.nextChildIdx);
     this.reachable = true;
-    // Check if ERP has changed
-    // TODO: Have ERPs provide 'equal' method to check whether they represent
-    //    the same distribution, even though they may refer to different objects.
-    if (erp !== this.erp) {
+    if (!distEqual(dist, this.dist)) {
       this.needsUpdate = true;
-      updateProperty(this, 'erp', erp);
-    }
-    // Check params for changes
-    if (!paramsEqual(params, this.params)) {
-      this.needsUpdate = true;
-      updateProperty(this, 'params', params);
+      updateProperty(this, 'dist', dist);
     }
   };
 
-  ERPNode.prototype.kontinue = function() {
+  DistNode.prototype.kontinue = function() {
     this.parent.notifyChildExecuted(this);
     // Call continuation
     // Copies store, so that we maintain a pristine copy of this.store
     return this.continuation(_.clone(this.store), this.val);
   };
 
-  ERPNode.prototype.killDescendantLeaves = function() {
-    this.coroutine.removeERP(this);
+  DistNode.prototype.killDescendantLeaves = function() {
+    this.coroutine.removeDist(this);
   };
 
-  ERPNode.prototype.propose = function() {
+  DistNode.prototype.propose = function() {
     var oldval = this.val;
-    var newval = this.erp.sample(this.params);
-    tabbedlog(4, this.depth, 'proposing change to ERP.', 'oldval:', oldval, 'newval:', newval);
+    var fwdPropDist = this.dist.driftKernel ? this.dist.driftKernel(oldval) : this.dist;
+    var newval = fwdPropDist.sample();
+    tabbedlog(4, this.depth, 'proposing change to distribution.', 'oldval:', oldval, 'newval:', newval);
     // If the value didn't change, then just bail out (we know the
     //    the proposal will be accepted)
     if (oldval === newval) {
@@ -59501,10 +59976,10 @@ module.exports = function(env) {
     } else {
       updateProperty(this, 'store', _.clone(this.store));
       updateProperty(this, 'val', newval);
-      var oldscore = this.score;
       this.rescore();
-      this.coroutine.rvsPropLP = oldscore;
-      this.coroutine.fwdPropLP = this.score;
+      var rvsPropDist = this.dist.driftKernel ? this.dist.driftKernel(newval) : this.dist;
+      this.coroutine.rvsPropLP = rvsPropDist.score(oldval);
+      this.coroutine.fwdPropLP = fwdPropDist.score(newval);
       tabbedlog(1, this.depth, 'initial rvsPropLP:', this.coroutine.rvsPropLP,
           'initial fwdPropLP:', this.coroutine.fwdPropLP);
       this.needsUpdate = false;
@@ -59523,11 +59998,45 @@ module.exports = function(env) {
     }
   };
 
-  ERPNode.prototype.rescore = function() {
+  DistNode.prototype.rescore = function() {
     var oldscore = this.score;
-    updateProperty(this, 'score', this.erp.score(this.params, this.val));
+    updateProperty(this, 'score', this.dist.score(this.val));
     this.coroutine.score += this.score - oldscore;
   };
+
+
+  // This is used to decide whether to re-score a distribution. Only a
+  // shallow check for parameter equality is performed, as a deep
+  // check is unlikely to be any faster than re-scoring.
+  function distEqual(dist1, dist2) {
+    return dist1.constructor === dist2.constructor &&
+        distParamsEqual(dist1.params, dist2.params);
+  }
+
+  function distParamsEqual(p1, p2) {
+    if (p1 === p2) {
+      return true;
+    }
+    //assert.strictEqual(_.size(p1), _.size(p2));
+    for (var k in p1) {
+      if (p1.hasOwnProperty(k)) {
+        //assert.ok(p2.hasOwnProperty(k));
+        var v1 = p1[k], v2 = p2[k];
+        if (typeof v1 === 'number') {
+          if (v1 !== v2) {
+            return false;
+          }
+        } else if (_.isArray(v1)) {
+          if (!_.isEqual(v1, v2)) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
   // ------------------------------------------------------------------
 
@@ -59600,21 +60109,6 @@ module.exports = function(env) {
     for (prop in s2) {
       if (s1[prop] !== s2[prop])
         return false;
-    }
-    return true;
-  }
-
-  function paramsEqual(p1, p2) {
-    if (p1 === p2) {
-      return true;
-    } else if (p1 === undefined || p2 === undefined) {
-      return false;
-    } else if (p1.length !== p2.length) {
-      return false;
-    } else {
-      for (var i = 0; i < p1.length; i++) {
-        if (p1[i] !== p2[i]) { return false; }
-      }
     }
     return true;
   }
@@ -59879,108 +60373,108 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  // Abstraction representing a master list of ERPs
+  // Abstraction representing a master list of distributions
   // (lets us abstract over whether we're using an array or a hash table)
 
-  function ArrayERPMasterList() {
-    this.erpNodes = [];
+  function ArrayDistMasterList() {
+    this.distNodes = [];
   }
 
-  ArrayERPMasterList.prototype.size = function() { return this.erpNodes.length; }
-      ArrayERPMasterList.prototype.oldSize = function() {
-        return this.oldErpNodes === undefined ? undefined : this.oldErpNodes.length;
+  ArrayDistMasterList.prototype.size = function() { return this.distNodes.length; }
+      ArrayDistMasterList.prototype.oldSize = function() {
+        return this.oldDistNodes === undefined ? undefined : this.oldDistNodes.length;
       }
 
-      ArrayERPMasterList.prototype.addERP = function(node) {
-        this.erpNodes.push(node);
+      ArrayDistMasterList.prototype.addDist = function(node) {
+        this.distNodes.push(node);
       };
 
-  ArrayERPMasterList.prototype.removeERP = function(node) {
+  ArrayDistMasterList.prototype.removeDist = function(node) {
     // Set it up to be removed as a post-process
     touch(node);
     node.reachable = false;
   };
 
-  ArrayERPMasterList.prototype.preProposal = function() {
-    this.oldErpNodes = this.erpNodes.slice();
+  ArrayDistMasterList.prototype.preProposal = function() {
+    this.oldDistNodes = this.distNodes.slice();
   };
 
-  ArrayERPMasterList.prototype.postProposal = function() {
-    this.erpNodes = _.filter(this.erpNodes, function(node) {
+  ArrayDistMasterList.prototype.postProposal = function() {
+    this.distNodes = _.filter(this.distNodes, function(node) {
       return node.reachable;
     });
   };
 
-  ArrayERPMasterList.prototype.getRandom = function() {
-    var idx = Math.floor(util.random() * this.erpNodes.length);
-    return this.erpNodes[idx];
+  ArrayDistMasterList.prototype.getRandom = function() {
+    var idx = Math.floor(util.random() * this.distNodes.length);
+    return this.distNodes[idx];
   };
 
-  ArrayERPMasterList.prototype.restoreOnReject = function() {
-    this.erpNodes = this.oldErpNodes;
+  ArrayDistMasterList.prototype.restoreOnReject = function() {
+    this.distNodes = this.oldDistNodes;
   };
 
 
-  function HashtableERPMasterList() {
-    this.erpNodeMap = new Hashtable();
-    this.erpsAdded = [];
-    this.erpsRemoved = [];
-    this.numErps = 0;
+  function HashtableDistMasterList() {
+    this.distNodeMap = new Hashtable();
+    this.distsAdded = [];
+    this.distsRemoved = [];
+    this.numDists = 0;
   }
 
-  HashtableERPMasterList.prototype.size = function() { return this.numErps; }
-      HashtableERPMasterList.prototype.oldSize = function() { return this.oldNumErps; }
+  HashtableDistMasterList.prototype.size = function() { return this.numDists; }
+      HashtableDistMasterList.prototype.oldSize = function() { return this.oldNumDists; }
 
-      HashtableERPMasterList.prototype.addERP = function(node) {
-        this.erpNodeMap.put(node.address, node);
-        this.erpsAdded.push(node);
-        this.numErps++;
-        // this.checkConsistency("addERP");
+      HashtableDistMasterList.prototype.addDist = function(node) {
+        this.distNodeMap.put(node.address, node);
+        this.distsAdded.push(node);
+        this.numDists++;
+        // this.checkConsistency("addDist");
       };
 
-  HashtableERPMasterList.prototype.removeERP = function(node) {
-    this.erpNodeMap.remove(node.address);
-    this.erpsRemoved.push(node);
-    this.numErps--;
-    // this.checkConsistency("removeERP");
+  HashtableDistMasterList.prototype.removeDist = function(node) {
+    this.distNodeMap.remove(node.address);
+    this.distsRemoved.push(node);
+    this.numDists--;
+    // this.checkConsistency("removeDist");
   };
 
-  HashtableERPMasterList.prototype.preProposal = function() {
-    this.oldNumErps = this.numErps;
-    this.erpsAdded = [];
-    this.erpsRemoved = [];
+  HashtableDistMasterList.prototype.preProposal = function() {
+    this.oldNumDists = this.numDists;
+    this.distsAdded = [];
+    this.distsRemoved = [];
   };
 
-  HashtableERPMasterList.prototype.postProposal = function() {};
+  HashtableDistMasterList.prototype.postProposal = function() {};
 
-  HashtableERPMasterList.prototype.getRandom = function() { return this.erpNodeMap.getRandom(); }
+  HashtableDistMasterList.prototype.getRandom = function() { return this.distNodeMap.getRandom(); }
 
-      HashtableERPMasterList.prototype.restoreOnReject = function() {
+      HashtableDistMasterList.prototype.restoreOnReject = function() {
         // this.checkConsistency("restoreOnReject");
-        this.numErps = this.oldNumErps;
-        var n = this.erpsAdded.length;
+        this.numDists = this.oldNumDists;
+        var n = this.distsAdded.length;
         while (n--) {
-          var node = this.erpsAdded[n];
-          this.erpNodeMap.remove(node.address);
+          var node = this.distsAdded[n];
+          this.distNodeMap.remove(node.address);
         }
-        n = this.erpsRemoved.length;
+        n = this.distsRemoved.length;
         while (n--) {
-          var node = this.erpsRemoved[n];
-          this.erpNodeMap.put(node.address, node);
+          var node = this.distsRemoved[n];
+          this.distNodeMap.put(node.address, node);
         }
       };
 
   // For debugging
-  HashtableERPMasterList.prototype.checkConsistency = function(tag) {
-    for (var i = 0; i < this.erpsAdded.length; i++) {
-      var addr = this.erpsAdded[i].address;
-      if (!this.erpNodeMap.get(addr))
-        throw "WTF - hash table doesn't contain node " + addr + ' that we added (' + tag + ')';
+  HashtableDistMasterList.prototype.checkConsistency = function(tag) {
+    for (var i = 0; i < this.distsAdded.length; i++) {
+      var addr = this.distsAdded[i].address;
+      if (!this.distNodeMap.get(addr))
+        throw new Error('WTF - hash table doesn\'t contain node ' + addr + ' that we added (' + tag + ')');
     }
-    for (var i = 0; i < this.erpsRemoved.length; i++) {
-      var addr = this.erpsRemoved[i].address;
-      if (this.erpNodeMap.get(addr))
-        throw 'WTF - hash table contains node ' + addr + ' that we removed (' + tag + ')';
+    for (var i = 0; i < this.distsRemoved.length; i++) {
+      var addr = this.distsRemoved[i].address;
+      if (this.distNodeMap.get(addr))
+        throw new Error('WTF - hash table contains node ' + addr + ' that we removed (' + tag + ')');
     }
   };
 
@@ -60081,8 +60575,10 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  function IncrementalMH(s, k, a, wpplFn, numIterations, opts) {
+  function IncrementalMH(s, k, a, wpplFn, opts) {
+    util.throwUnlessOpts(opts, 'IncrementalMH');
     // Extract options
+    var numSamples = opts.samples === undefined ? 1 : opts.samples;
     var dontAdapt = opts.dontAdapt === undefined ? false : opts.dontAdapt;
     var debuglevel = opts.debuglevel === undefined ? 0 : opts.debuglevel;
     var verbose = opts.verbose === undefined ? false : opts.verbose;
@@ -60106,16 +60602,16 @@ module.exports = function(env) {
 
     this.k = k;
     this.oldStore = s;
-    this.iterations = numIterations;
+    this.iterations = numSamples * (lag + 1) + burn;
     this.wpplFn = wpplFn;
     this.s = s;
     this.a = a;
 
     this.aggregator = (justSample || onlyMAP) ?
-        new MAP(justSample) :
-        new Histogram();
+        new MaxAggregator(justSample) :
+        new CountAggregator();
 
-    this.totalIterations = numIterations;
+    this.totalIterations = this.iterations;
     this.acceptedProps = 0;
     this.lag = lag;
     this.burn = burn;
@@ -60134,8 +60630,8 @@ module.exports = function(env) {
 
   IncrementalMH.prototype.run = function() {
     this.cacheRoot = null;
-    this.erpMasterList = new HashtableERPMasterList();
-    // this.erpMasterList = new ArrayERPMasterList();
+    this.distMasterList = new HashtableDistMasterList();
+    // this.distMasterList = new ArrayDistMasterList();
     this.touchedNodes = [];
     this.score = 0;
     this.fwdPropLP = 0;
@@ -60158,8 +60654,8 @@ module.exports = function(env) {
     return this.cachelookup(FactorNode, s, k, a, null, [score]).execute();
   };
 
-  IncrementalMH.prototype.sample = function(s, k, a, erp, params, name) {
-    var n = this.cachelookup(ERPNode, s, k, a, erp, params);
+  IncrementalMH.prototype.sample = function(s, k, a, dist, name) {
+    var n = this.cachelookup(DistNode, s, k, a, dist);
     n.name = name;
     return n.execute();
   };
@@ -60207,23 +60703,23 @@ module.exports = function(env) {
         // Continue proposing as normal
         this.iterations--;
 
-        this.erpMasterList.postProposal();
+        this.distMasterList.postProposal();
 
-        debuglog(2, 'Num vars:', this.erpMasterList.size());
+        debuglog(2, 'Num vars:', this.distMasterList.size());
         debuglog(2, 'Touched nodes:', this.touchedNodes.length);
 
         // Accept/reject the current proposal
         var acceptance = acceptProb(this.score, this.oldScore,
-                                    this.erpMasterList.size(), this.erpMasterList.oldSize(),
+                                    this.distMasterList.size(), this.distMasterList.oldSize(),
                                     this.rvsPropLP, this.fwdPropLP);
-        debuglog(1, 'num vars:', this.erpMasterList.size(), 'old num vars:', this.erpMasterList.oldSize());
+        debuglog(1, 'num vars:', this.distMasterList.size(), 'old num vars:', this.distMasterList.oldSize());
         debuglog(1, 'acceptance prob:', acceptance);
         if (util.random() >= acceptance) {
           debuglog(1, 'REJECT');
           this.score = this.oldScore;
           var n = this.touchedNodes.length;
           while (n--) restoreSnapshot(this.touchedNodes[n]);
-          this.erpMasterList.restoreOnReject();
+          this.distMasterList.restoreOnReject();
         }
         else {
           debuglog(1, 'ACCEPT');
@@ -60238,7 +60734,7 @@ module.exports = function(env) {
         debuglog(1, 'return val:', val);
 
         // Record this sample, if lag allows for it and not in burnin period
-        if ((iternum % (this.lag + 1) === 0) && (iternum > this.burn)) {
+        if ((iternum % (this.lag + 1) === 0) && (iternum >= this.burn)) {
           // Replace val with accumulated query, if need be.
           if (val === env.query)
             val = this.query.getTable();
@@ -60256,18 +60752,18 @@ module.exports = function(env) {
         if (this.doAdapt)
           this.cacheAdapter.adapt(this.cacheRoot);
 
-        if (this.erpMasterList.numErps > 0) {
+        if (this.distMasterList.numDists > 0) {
           // Prepare to make a new proposal
           this.oldScore = this.score;
-          this.erpMasterList.preProposal();
+          this.distMasterList.preProposal();
           this.touchedNodes = [];
           this.fwdPropLP = 0;
           this.rvsPropLP = 0;
-          // Select ERP to change.
-          var propnode = this.erpMasterList.getRandom();
+          // Select distribution to change.
+          var propnode = this.distMasterList.getRandom();
           // Propose change and resume execution
           debuglog(1, '----------------------------------------------------------------------');
-          debuglog(1, 'PROPOSAL', 'type:', propnode.erp.sample.name, 'address:', propnode.address);
+          debuglog(1, 'PROPOSAL', 'type:', propnode.dist, 'address:', propnode.address);
           return propnode.propose();
         } else {
           return this.runFromStart();
@@ -60284,7 +60780,7 @@ module.exports = function(env) {
       }
 
       // Return by calling original continuation:
-      return k(this.oldStore, this.aggregator.toERP());
+      return k(this.oldStore, this.aggregator.toDist());
     }
   };
 
@@ -60305,7 +60801,7 @@ module.exports = function(env) {
     // If the node stack is empty, then we must be looking up the root on a
     //    re-run from start
     } else if (this.nodeStack.length === 0) {
-      if (a !== this.cacheRoot.address) throw 'Wrong address for cache root lookup';
+      if (a !== this.cacheRoot.address) throw new Error('Wrong address for cache root lookup');
       cacheNode = this.cacheRoot;
       cacheNode.registerInputChanges(s, k, fn, args);
     // Otherwise, do the general thing.
@@ -60353,7 +60849,7 @@ module.exports = function(env) {
         // Keep nodes ordered according to execution order: if
         // i !== nexti, then swap those two.
         if (i !== nexti) {
-          // if (i < nexti) throw "WTF - cache node found *before* first possible location";
+          // if (i < nexti) throw new Error('WTF - cache node found *before* first possible location');
           if (!hasSnapshotForProperty(parentNode, 'children')) {
             nodes = nodes.slice();
             updateProperty(parentNode, 'children', nodes);
@@ -60367,15 +60863,15 @@ module.exports = function(env) {
     }
   };
 
-  IncrementalMH.prototype.addERP = function(node) {
-    tabbedlog(3, node.depth, 'new ERP');
-    this.erpMasterList.addERP(node);
+  IncrementalMH.prototype.addDist = function(node) {
+    tabbedlog(3, node.depth, 'new distribution');
+    this.distMasterList.addDist(node);
     this.fwdPropLP += node.score;
   };
 
-  IncrementalMH.prototype.removeERP = function(node) {
-    tabbedlog(3, node.depth, 'kill ERP', node.address);
-    this.erpMasterList.removeERP(node);
+  IncrementalMH.prototype.removeDist = function(node) {
+    tabbedlog(3, node.depth, 'kill distribution', node.address);
+    this.distMasterList.removeDist(node);
     this.rvsPropLP += node.score;
     this.score -= node.score;
   };
@@ -60409,7 +60905,7 @@ module.exports = function(env) {
     var stack = [this.cacheRoot];
     while (stack.length > 0) {
       var node = stack.pop();
-      if (!node.reachable) throw 'WTF - found unreachable node in cache.';
+      if (!node.reachable) throw new Error('WTF - found unreachable node in cache.');
       if (node.children !== undefined)
         for (var i = 0; i < node.children.length; i++)
           stack.push(node.children[i]);
@@ -60419,9 +60915,9 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  function imh(s, cc, a, wpplFn, numIters, opts) {
+  function imh(s, cc, a, wpplFn, opts) {
     opts = opts || {};
-    return new IncrementalMH(s, cc, a, wpplFn, numIters, opts).run();
+    return new IncrementalMH(s, cc, a, wpplFn, opts).run();
   }
 
   return {
@@ -60431,7 +60927,7 @@ module.exports = function(env) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../aggregation/histogram":154,"../aggregation/map":155,"../hashtable":163,"../query":179,"../util":190,"assert":192,"underscore":151}],170:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../aggregation/MaxAggregator":154,"../hashtable":163,"../query":179,"../util":192,"assert":194,"underscore":151}],170:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
@@ -60465,10 +60961,10 @@ module.exports = function(env) {
     return this.trace.continue();
   };
 
-  Initialize.prototype.sample = function(s, k, a, erp, params) {
-    var _val = erp.sample(ad.valueRec(params));
-    var val = this.ad && erp.isContinuous ? ad.lift(_val) : _val;
-    this.trace.addChoice(erp, params, val, a, s, k);
+  Initialize.prototype.sample = function(s, k, a, dist) {
+    var _val = dist.sample();
+    var val = this.ad && dist.isContinuous ? ad.lift(_val) : _val;
+    this.trace.addChoice(dist, val, a, s, k);
     return k(s, val);
   };
 
@@ -60508,7 +61004,7 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../trace":181,"assert":192,"underscore":151}],171:[function(require,module,exports){
+},{"../ad":152,"../trace":181,"assert":194,"underscore":151}],171:[function(require,module,exports){
 'use strict';
 
 var assert = require('assert');
@@ -60555,7 +61051,7 @@ module.exports = function(env) {
     }
 
     if (!isKernelOption(obj)) {
-      throw 'Unrecognized kernel option: ' + JSON.stringify(obj);
+      throw new Error('Unrecognized kernel option: ' + JSON.stringify(obj));
     }
 
     var name = _.isString(obj) ? obj : _.keys(obj)[0];
@@ -60608,14 +61104,15 @@ module.exports = function(env) {
 
 };
 
-},{"../util":190,"./hmckernel":168,"./mhkernel":173,"assert":192,"underscore":151}],172:[function(require,module,exports){
+},{"../util":192,"./hmckernel":168,"./mhkernel":173,"assert":194,"underscore":151}],172:[function(require,module,exports){
 (function (process){
 'use strict';
 
 var _ = require('underscore');
 var util = require('../util');
-var Histogram = require('../aggregation/histogram');
-var MAP = require('../aggregation/map');
+var CountAggregator = require('../aggregation/CountAggregator');
+var MaxAggregator = require('../aggregation/MaxAggregator');
+var ad = require('../ad');
 
 module.exports = function(env) {
 
@@ -60623,6 +61120,7 @@ module.exports = function(env) {
   var kernels = require('./kernels')(env);
 
   function MCMC(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'MCMC');
     var options = util.mergeDefaults(options, {
       samples: 100,
       kernel: 'MH',
@@ -60639,8 +61137,12 @@ module.exports = function(env) {
     _.invoke(callbacks, 'setup', numIters(options));
 
     var aggregator = (options.justSample || options.onlyMAP) ?
-        new MAP(options.justSample) :
-        new Histogram();
+        new MaxAggregator(options.justSample) :
+        new CountAggregator();
+
+    var addToAggregator = options.kernel.adRequired ?
+        function(value, score) { aggregator.add(ad.valueRec(value), ad.value(score)); } :
+        aggregator.add.bind(aggregator);
 
     var initialize, run, finish;
 
@@ -60652,7 +61154,7 @@ module.exports = function(env) {
     run = function(initialTrace) {
       initialTrace.info = { accepted: 0, total: 0 };
       var callback = kernels.tap(function(trace) { _.invoke(callbacks, 'iteration', trace); });
-      var collectSample = makeExtractValue(aggregator.add.bind(aggregator));
+      var collectSample = makeExtractValue(addToAggregator);
       var kernel = kernels.sequence(options.kernel, callback);
       var chain = kernels.sequence(
           kernels.repeat(options.burn, kernel),
@@ -60665,7 +61167,7 @@ module.exports = function(env) {
 
     finish = function(trace) {
       _.invoke(callbacks, 'finish', trace);
-      return k(s, aggregator.toERP());
+      return k(s, aggregator.toDist());
     };
 
     return initialize();
@@ -60734,12 +61236,11 @@ module.exports = function(env) {
 };
 
 }).call(this,require('_process'))
-},{"../aggregation/histogram":154,"../aggregation/map":155,"../util":190,"./initialize":170,"./kernels":171,"_process":389,"underscore":151}],173:[function(require,module,exports){
+},{"../ad":152,"../aggregation/CountAggregator":153,"../aggregation/MaxAggregator":154,"../util":192,"./initialize":170,"./kernels":171,"_process":391,"underscore":151}],173:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
 var assert = require('assert');
-var erp = require('../erp');
 var util = require('../util');
 var ad = require('../ad');
 
@@ -60779,7 +61280,7 @@ module.exports = function(env) {
     env.query.clear();
     this.trace = this.oldTrace.upto(this.regenFrom);
     var regen = this.oldTrace.choiceAtIndex(this.regenFrom);
-    return this.sample(_.clone(regen.store), regen.k, regen.address, regen.erp, regen.params, true);
+    return this.sample(_.clone(regen.store), regen.k, regen.address, regen.dist, true);
   };
 
   MHKernel.prototype.factor = function(s, k, a, score) {
@@ -60796,18 +61297,17 @@ module.exports = function(env) {
     return k(s);
   };
 
-  MHKernel.prototype.sample = function(s, k, a, erp, params, forceSample) {
+  MHKernel.prototype.sample = function(s, k, a, dist, forceSample) {
     var _val, val;
     var prevChoice = this.oldTrace.findChoice(a);
 
     if (forceSample) {
       assert(prevChoice);
-      var proposalErp = erp.proposer || erp;
-      var proposalParams = erp.proposer ? [params, prevChoice.val] : params;
-      _val = proposalErp.sample(ad.valueRec(proposalParams));
-      val = this.adRequired && proposalErp.isContinuous ? ad.lift(_val) : _val;
+      var proposalDist = dist.driftKernel ? dist.driftKernel(prevChoice.val) : dist;
+      _val = proposalDist.sample();
+      val = this.adRequired && proposalDist.isContinuous ? ad.lift(_val) : _val;
       // Optimization: Bail early if same value is re-sampled.
-      if (!proposalErp.isContinuous && prevChoice.val === val) {
+      if (!proposalDist.isContinuous && prevChoice.val === val) {
         return this.finish(this.oldTrace, true);
       }
     } else {
@@ -60815,12 +61315,12 @@ module.exports = function(env) {
         val = prevChoice.val; // Will be a tape if continuous.
         this.reused[a] = true;
       } else {
-        _val = erp.sample(ad.valueRec(params));
-        val = this.adRequired && erp.isContinuous ? ad.lift(_val) : _val;
+        _val = dist.sample();
+        val = this.adRequired && dist.isContinuous ? ad.lift(_val) : _val;
       }
     }
 
-    this.trace.addChoice(erp, params, val, a, s, k);
+    this.trace.addChoice(dist, val, a, s, k);
     if (ad.value(this.trace.score) === -Infinity) {
       return this.finish(this.oldTrace, false);
     }
@@ -60858,15 +61358,15 @@ module.exports = function(env) {
 
   MHKernel.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  MHKernel.prototype.proposableDiscreteErpIndices = function(trace) {
+  MHKernel.prototype.proposableDiscreteDistIndices = function(trace) {
     return _.range(this.proposalBoundary, trace.length).filter(function(i) {
-      return !trace.choices[i].erp.isContinuous;
+      return !trace.choices[i].dist.isContinuous;
     });
   };
 
   MHKernel.prototype.numRegenChoices = function(trace) {
     if (this.discreteOnly) {
-      return this.proposableDiscreteErpIndices(trace).length;
+      return this.proposableDiscreteDistIndices(trace).length;
     } else {
       return trace.length - this.proposalBoundary;
     }
@@ -60879,7 +61379,7 @@ module.exports = function(env) {
   };
 
   MHKernel.prototype.sampleRegenChoiceDiscrete = function(trace) {
-    var indices = this.proposableDiscreteErpIndices(trace);
+    var indices = this.proposableDiscreteDistIndices(trace);
     return indices.length > 0 ? indices[Math.floor(util.random() * indices.length)] : -1;
   };
 
@@ -60904,23 +61404,21 @@ module.exports = function(env) {
   };
 
   MHKernel.prototype.transitionProb = function(fromTrace, toTrace) {
-    // Proposed to ERP.
-    var proposalErp, proposalParams;
+    // Proposed to distribution.
+    var proposalDist;
     var regenChoice = toTrace.choiceAtIndex(this.regenFrom);
 
-    if (regenChoice.erp.proposer) {
-      proposalErp = regenChoice.erp.proposer;
-      proposalParams = [regenChoice.params, fromTrace.choiceAtIndex(this.regenFrom).val];
+    if (regenChoice.dist.driftKernel) {
+      proposalDist = regenChoice.dist.driftKernel(fromTrace.choiceAtIndex(this.regenFrom).val);
     } else {
-      proposalErp = regenChoice.erp;
-      proposalParams = regenChoice.params;
+      proposalDist = regenChoice.dist;
     }
 
-    var score = ad.value(proposalErp.score(proposalParams, regenChoice.val));
+    var score = ad.value(proposalDist.score(regenChoice.val));
 
     // Rest of the trace.
     score += util.sum(toTrace.choices.slice(this.regenFrom + 1).map(function(choice) {
-      return this.reused.hasOwnProperty(choice.address) ? 0 : ad.value(choice.erp.score(choice.params, choice.val));
+      return this.reused.hasOwnProperty(choice.address) ? 0 : ad.value(choice.dist.score(choice.val));
     }, this));
 
     score -= Math.log(this.numRegenChoices(fromTrace));
@@ -60934,16 +61432,16 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../erp":162,"../util":190,"assert":192,"underscore":151}],174:[function(require,module,exports){
+},{"../ad":152,"../util":192,"assert":194,"underscore":151}],174:[function(require,module,exports){
 ////////////////////////////////////////////////////////////////////
 // PMCMC
 
 'use strict';
 
 var _ = require('underscore');
-var erp = require('../erp');
+var dists = require('../dists');
 var util = require('../util')
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 
 module.exports = function(env) {
 
@@ -60951,8 +61449,9 @@ module.exports = function(env) {
     return xs[xs.length - 1];
   }
 
-  function PMCMC(s, cc, a, wpplFn, numParticles, numSweeps) {
 
+  function PMCMC(s, cc, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'PMCMC');
     // Move old coroutine out of the way and install this as the
     // current handler.
     this.oldCoroutine = env.coroutine;
@@ -60966,13 +61465,13 @@ module.exports = function(env) {
     // Setup inference variables
     this.particleIndex = 0;  // marks the active particle
     this.retainedParticle = undefined;
-    this.numSweeps = numSweeps;
+    this.numSweeps = options.sweeps;
     this.sweep = 0;
     this.wpplFn = wpplFn;
     this.address = a;
-    this.numParticles = numParticles;
+    this.numParticles = options.particles;
     this.resetParticles();
-    this.hist = new Histogram();
+    this.hist = new CountAggregator();
   }
 
   PMCMC.prototype.run = function() {
@@ -61018,8 +61517,8 @@ module.exports = function(env) {
     return ((this.particleIndex + 1) === this.particles.length);
   };
 
-  PMCMC.prototype.sample = function(s, cc, a, erp, params) {
-    return cc(s, erp.sample(params));
+  PMCMC.prototype.sample = function(s, cc, a, dist) {
+    return cc(s, dist.sample());
   };
 
   PMCMC.prototype.particleAtStep = function(particle, step) {
@@ -61057,7 +61556,7 @@ module.exports = function(env) {
     var j;
     var newParticles = [];
     for (var i = 0; i < particles.length; i++) {
-      j = erp.discreteSample(weights);
+      j = dists.discreteSample(weights);
       newParticles.push(this.copyParticle(particles[j]));
     }
 
@@ -61126,7 +61625,7 @@ module.exports = function(env) {
         env.coroutine = this.oldCoroutine;
 
         // Return from particle filter by calling original continuation:
-        return this.k(this.oldStore, this.hist.toERP());
+        return this.k(this.oldStore, this.hist.toDist());
 
       }
     }
@@ -61134,8 +61633,8 @@ module.exports = function(env) {
 
   PMCMC.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  function pmc(s, cc, a, wpplFn, numParticles, numSweeps) {
-    return new PMCMC(s, cc, a, wpplFn, numParticles, numSweeps).run();
+  function pmc(s, cc, a, wpplFn, options) {
+    return new PMCMC(s, cc, a, wpplFn, options).run();
   }
 
   return {
@@ -61144,7 +61643,7 @@ module.exports = function(env) {
 
 };
 
-},{"../aggregation/histogram":154,"../erp":162,"../util":190,"underscore":151}],175:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../dists":162,"../util":192,"underscore":151}],175:[function(require,module,exports){
 // Rejection sampling
 //
 // maxScore: An upper bound on the total factor score per-execution.
@@ -61156,27 +61655,32 @@ module.exports = function(env) {
 'use strict';
 
 var _ = require('underscore');
-var erp = require('../erp');
 var assert = require('assert');
 var util = require('../util');
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 
 module.exports = function(env) {
 
-  function Rejection(s, k, a, wpplFn, numSamples, maxScore, incremental) {
+  function Rejection(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'Rejection');
+    options = util.mergeDefaults(options, {
+      samples: 1,
+      maxScore: 0,
+      incremental: false
+    });
+    this.numSamples = options.samples;
+    this.maxScore = options.maxScore;
+    this.incremental = options.incremental;
     this.s = s;
     this.k = k;
     this.a = a;
     this.wpplFn = wpplFn;
-    this.maxScore = (maxScore === undefined) ? 0 : maxScore;
-    this.incremental = incremental;
-    this.hist = new Histogram();
-    this.numSamples = (numSamples === undefined) ? 1 : numSamples;
+    this.hist = new CountAggregator();
     this.oldCoroutine = env.coroutine;
     env.coroutine = this;
 
-    if (!_.isNumber(numSamples) || numSamples <= 0) {
-      throw 'numSamples should be a positive integer.';
+    if (!_.isNumber(this.numSamples) || this.numSamples <= 0) {
+      throw new Error('samples should be a positive integer.');
     }
 
     if (this.incremental) {
@@ -61190,8 +61694,8 @@ module.exports = function(env) {
     return this.wpplFn(_.clone(this.s), env.exit, this.a);
   };
 
-  Rejection.prototype.sample = function(s, k, a, erp, params) {
-    return k(s, erp.sample(params));
+  Rejection.prototype.sample = function(s, k, a, dist) {
+    return k(s, dist.sample());
   };
 
   Rejection.prototype.factor = function(s, k, a, score) {
@@ -61222,7 +61726,7 @@ module.exports = function(env) {
 
     if (this.numSamples === 0) {
       env.coroutine = this.oldCoroutine;
-      return this.k(this.s, this.hist.toERP());
+      return this.k(this.s, this.hist.toDist());
     } else {
       return this.run();
     }
@@ -61230,8 +61734,8 @@ module.exports = function(env) {
 
   Rejection.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  function rej(s, k, a, wpplFn, numSamples, maxScore, incremental) {
-    return new Rejection(s, k, a, wpplFn, numSamples, maxScore, incremental).run();
+  function rej(s, k, a, wpplFn, options) {
+    return new Rejection(s, k, a, wpplFn, options).run();
   }
 
   return {
@@ -61240,16 +61744,16 @@ module.exports = function(env) {
 
 };
 
-},{"../aggregation/histogram":154,"../erp":162,"../util":190,"assert":192,"underscore":151}],176:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../util":192,"assert":194,"underscore":151}],176:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
 var util = require('../util');
-var erp = require('../erp');
+var dists = require('../dists');
 var Trace = require('../trace');
 
 var assert = require('assert');
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 var ad = require('../ad');
 
 module.exports = function(env) {
@@ -61257,6 +61761,7 @@ module.exports = function(env) {
   var kernels = require('./kernels')(env);
 
   function SMC(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'SMC');
     var options = util.mergeDefaults(options, {
       particles: 100,
       rejuvSteps: 0,
@@ -61267,8 +61772,8 @@ module.exports = function(env) {
     this.rejuvKernel = kernels.parseOptions(options.rejuvKernel);
     this.rejuvSteps = options.rejuvSteps;
 
-    this.adRequired = this.rejuvKernel.adRequired;
     this.performRejuv = this.rejuvSteps > 0;
+    this.adRequired = this.performRejuv && this.rejuvKernel.adRequired;
     this.performFinalRejuv = this.performRejuv && options.finalRejuv;
     this.numParticles = options.particles;
     this.debug = options.debug;
@@ -61295,19 +61800,18 @@ module.exports = function(env) {
     return this.runCurrentParticle();
   };
 
-  SMC.prototype.sample = function(s, k, a, erp, params) {
-    var importanceERP = erp.importanceERP || erp;
-    var _params = ad.valueRec(params);
-    var _val = importanceERP.sample(_params);
-    var val = this.adRequired && importanceERP.isContinuous ? ad.lift(_val) : _val;
-    var importanceScore = importanceERP.score(_params, _val);
-    var choiceScore = erp.score(_params, _val);
+  SMC.prototype.sample = function(s, k, a, dist) {
+    var importanceDist = dist.importanceDist || dist;
+    var _val = importanceDist.sample();
+    var val = this.adRequired && importanceDist.isContinuous ? ad.lift(_val) : _val;
+    var importanceScore = importanceDist.score(_val);
+    var choiceScore = dist.score(_val);
     var particle = this.currentParticle();
     // Optimization: Choices are not required for PF without rejuvenation.
     if (this.performRejuv) {
-      particle.trace.addChoice(erp, params, val, a, s, k);
+      particle.trace.addChoice(dist, val, a, s, k);
     }
-    particle.logWeight += choiceScore - importanceScore;
+    particle.logWeight += ad.value(choiceScore) - ad.value(importanceScore);
     return k(s, val);
   };
 
@@ -61375,7 +61879,7 @@ module.exports = function(env) {
     var newParticles = [];
     var j;
     for (var i = 0; i < numNewParticles; i++) {
-      j = erp.discreteSample(newWeights);
+      j = dists.discreteSample(newWeights);
       newParticles.push(particles[j].copy());
     }
 
@@ -61500,7 +62004,10 @@ module.exports = function(env) {
   SMC.prototype.finish = function(s, val) {
     assert.strictEqual(this.completeParticles.length, this.numParticles);
 
-    var hist = new Histogram();
+    var hist = new CountAggregator();
+    var addToHist = this.adRequired ?
+        function(value) { hist.add(ad.valueRec(value)); } :
+        hist.add.bind(hist);
     var logAvgW = _.first(this.completeParticles).logWeight;
 
     return util.cpsForEach(
@@ -61511,15 +62018,15 @@ module.exports = function(env) {
                 this.rejuvSteps,
                 kernels.sequence(
                     this.rejuvKernel,
-                    kernels.tap(function(trace) { hist.add(trace.value); })));
+                    kernels.tap(function(trace) { addToHist(trace.value); })));
             return chain(k, particle.trace);
           } else {
-            hist.add(particle.trace.value);
+            addToHist(particle.trace.value);
             return k();
           }
         }.bind(this),
         function() {
-          var dist = hist.toERP();
+          var dist = hist.toDist();
           dist.normalizationConstant = logAvgW;
           env.coroutine = this.coroutine;
           return this.k(this.s, dist);
@@ -61529,7 +62036,7 @@ module.exports = function(env) {
 
   SMC.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  // Restrict rejuvenation to erps that come after proposal boundary.
+  // Restrict rejuvenation to choices that come after proposal boundary.
   function setProposalBoundary(s, k, a) {
     if (env.coroutine.currentParticle) {
       var particle = env.coroutine.currentParticle();
@@ -61560,17 +62067,14 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../aggregation/histogram":154,"../erp":162,"../trace":181,"../util":190,"./kernels":171,"assert":192,"underscore":151}],177:[function(require,module,exports){
+},{"../ad":152,"../aggregation/CountAggregator":153,"../dists":162,"../trace":181,"../util":192,"./kernels":171,"assert":194,"underscore":151}],177:[function(require,module,exports){
 ////////////////////////////////////////////////////////////////////
 // Simple Variational inference wrt the (pseudo)mean-field program.
-// We do stochastic gradient descent on the ERP params.
+// We do stochastic gradient descent on the dist params.
 // On sample statements: sample and accumulate grad-log-score, orig-score, and variational-score
 // On factor statements accumulate into orig-score.
 
 'use strict';
-
-var erp = require('../erp');
-
 
 module.exports = function(env) {
 
@@ -61614,7 +62118,7 @@ module.exports = function(env) {
     this.wpplFn(this.initialStore, env.exit, this.initialAddress);
   };
 
-  Variational.prototype.sample = function(s, k, a, erp, params) {
+  Variational.prototype.sample = function(s, k, a, dist, params) {
     //sample from variational dist
     if (!this.variationalParams.hasOwnProperty(a)) {
       //initialize at prior (for this sample)...
@@ -61622,14 +62126,14 @@ module.exports = function(env) {
       this.runningG2[a] = [0];//fixme: vec size
     }
     var vParams = this.variationalParams[a];
-    var val = erp.sample(vParams);
+    var val = dist.sample(vParams);
 
     //compute variational dist grad
-    this.samplegrad[a] = erp.grad(vParams, val);
+    this.samplegrad[a] = dist.grad(vParams, val);
 
     //compute target score + variational score
-    this.jointScore += erp.score(params, val);
-    this.variScore += erp.score(vParams, val);
+    this.jointScore += dist.score(params, val);
+    this.variScore += dist.score(vParams, val);
 
     k(s, val); //TODO: need a?
   };
@@ -61685,7 +62189,7 @@ module.exports = function(env) {
       return this.takeGradSample();
     }
 
-    //return variational dist as ERP:
+    //return variational dist:
     //FIXME
     console.log(this.variationalParams);
     var dist = null;
@@ -61725,7 +62229,7 @@ module.exports = function(env) {
 
 };
 
-},{"../erp":162}],178:[function(require,module,exports){
+},{}],178:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -61739,6 +62243,7 @@ var _ = require('underscore');
 var sweet = require('sweet.js');
 
 var cps = require('./transforms/cps').cps;
+var addFilename = require('./transforms/addFilename').addFilename;
 var optimize = require('./transforms/optimize').optimize;
 var naming = require('./transforms/naming').naming;
 var store = require('./transforms/store').store;
@@ -61780,7 +62285,8 @@ function concatPrograms(programs) {
 }
 
 function parse(code, macros, filename) {
-  return sweet.compile(code, { readableNames: true, ast: true, modules: macros });
+  var compiled = sweet.compile(code, { readableNames: true, ast: true, modules: macros });
+  return addFilename(compiled, filename);
 }
 
 function parseAll(bundles) {
@@ -61799,8 +62305,8 @@ function loadMacros(pkg) {
 
 function headerPackage() {
   // Create a pseudo package from the header.
-  var code = "'no caching';\n\n// ERPs\n\nvar flip = function(theta) {\n  var theta = (theta !== undefined) ? theta : 0.5;\n  return sample(bernoulliERP, [theta]);\n};\n\nvar randomInteger = function(n) {\n  return sample(randomIntegerERP, [n]);\n};\n\nvar discrete = function(ps) {\n  return sample(discreteERP, [ps]);\n};\n\nvar categorical = function(ps, vs) {\n  return vs[discrete(ps)];\n};\n\nvar multinomial = function(ps, n) {\n  return sample(multinomialERP, [ps, n]);\n};\n\nvar gaussian = function(mu, sigma) {\n  return sample(gaussianERP, [mu, sigma]);\n};\n\nvar multivariateGaussian = function(mu, cov) {\n  return sample(multivariateGaussianERP, [mu, cov]);\n};\n\nvar cauchy = function(location, scale) {\n  return sample(cauchyERP, [location, scale]);\n};\n\nvar uniform = function(a, b) {\n  return sample(uniformERP, [a, b]);\n};\n\nvar uniformDraw = function(l) {\n  return l[sample(randomIntegerERP, [l.length])];\n};\n\nvar dirichlet = function(alpha) {\n  return sample(dirichletERP, alpha);\n};\n\nvar poisson = function(mu) {\n  return sample(poissonERP, [mu]);\n};\n\nvar binomial = function(p, n) {\n  return sample(binomialERP, [p, n]);\n};\n\nvar beta = function(a, b) {\n  return sample(betaERP, [a, b]);\n};\n\nvar exponential = function(a) {\n  return sample(exponentialERP, [a]);\n};\n\nvar gamma = function(shape, scale) {\n  return sample(gammaERP, [shape, scale]);\n};\n\nvar deltaERP = function(v) {\n  return _top.makeCategoricalERP([1.0], [v]);\n};\n\nvar categoricalERP = function(ps, vs, extraParams) {\n  return _top.makeCategoricalERP(ps, vs, extraParams);\n};\n\nvar multiplexERP = function(vs, erps) {\n  return _top.makeMultiplexERP(vs, erps);\n};\n\nvar serializeERP = function(erp) {\n  return _top.serializeERP(erp);\n};\n\nvar deserializeERP = function(JSONString) {\n  return _top.deserializeERP(JSONString);\n};\n\n// XRPs\n\nvar makeBetaBernoulli = function(pseudocounts) {\n  globalStore.BBindex = 1 + (globalStore.BBindex || 0);\n  var bbname = 'BB' + globalStore.BBindex;\n  globalStore[bbname] = pseudocounts;\n  return function() {\n    var pc = globalStore[bbname];  // get current sufficient stats\n    var val = sample(bernoulliERP, [pc[0] / (pc[0] + pc[1])]);  // sample from predictive.\n    globalStore[bbname] = [pc[0] + val, pc[1] + !val];  // update sufficient stats\n    return val;\n  };\n};\n\nvar makeDirichletDiscrete = function(pseudocounts) {\n  var addCount = function(a, i, j) {\n    var j = j || 0;\n    if (a.length === 0) {\n      return [];\n    } else {\n      return [a[0] + (i === j)].concat(addCount(a.slice(1), i, j + 1));\n    }\n  };\n  globalStore.DDindex = 1 + (globalStore.DDindex || 0);\n  var ddname = 'DD' + globalStore.DDindex;\n  globalStore[ddname] = pseudocounts;\n  return function() {\n    var pc = globalStore[ddname];  // get current sufficient stats\n    var val = sample(discreteERP, [pc]);  // sample from predictive. (doesn't need to be normalized.)\n    globalStore[ddname] = addCount(pc, val); // update sufficient stats\n    return val;\n  };\n};\n\n// Arithmetic and other functionals\n\nvar plus = function(a, b) {\n  return a + b;\n};\nvar minus = function(a, b) {\n  return a - b;\n};\nvar mult = function(a, b) {\n  return a * b;\n};\nvar div = function(a, b) {\n  return a / b;\n};\n\nvar and = function(a, b) {\n  return a && b\n}\nvar or = function(a, b) {\n  return a || b\n}\n\nvar eq = function(a, b) {\n  return a === b;\n};\nvar neq = function(a, b) {\n  return a != b;\n};\nvar lt = function(a, b) {\n  return a < b;\n};\nvar gt = function(a, b) {\n  return a > b;\n};\nvar leq = function(a, b) {\n  return a <= b;\n};\nvar geq = function(a, b) {\n  return a >= b;\n};\n\nvar isEven = function(v) {\n  return v % 2 === 0;\n};\nvar isOdd = function(v) {\n  return v % 2 != 0;\n};\n\nvar idF = function(x) {\n  return x;\n};\nvar constF = function(f) {\n  return function() {\n    return f;\n  };\n};\nvar falseF = function() {\n  return false;\n};\nvar trueF = function() {\n  return true;\n};\n\n// Probability computations & calculations\n\nvar MAP = function(erp) {\n  return erp.MAP();\n};\n\nvar expectation = function(erp, func) {\n  var f = func || idF;\n  var supp = erp.support([]);\n  return mapReduce1(plus,\n                    function(s) {\n                      return Math.exp(erp.score([], s)) * f(s);\n                    },\n                    supp);\n};\n\nvar entropy = function(erp) {\n  return erp.entropy();\n};\n\n// Data structures & higher-order functions\n\nvar append = function(a, b) {\n  return a.concat(b);\n};\nvar cons = function(a, b) {\n  return [a].concat(b);\n};\nvar snoc = function(a, b) {\n  return a.concat([b]);\n};\n\nvar first = function(xs) {\n  return xs[0];\n};\nvar second = function(xs) {\n  return xs[1];\n};\nvar third = function(xs) {\n  return xs[2];\n};\nvar fourth = function(xs) {\n  return xs[3];\n};\nvar secondLast = function(xs) {\n  return xs[xs.length - 2];\n};\nvar last = function(xs) {\n  return xs[xs.length - 1];\n};\n\nvar most = function(xs) {\n  return xs.slice(0, xs.length - 1);\n}\n\nvar rest = function(xs) {\n  return xs.slice(1);\n};\n\nvar map_helper = function(i, j, f) {\n  var n = j - i + 1;\n  if (n == 0) {\n    return []\n  } else if (n == 1) {\n    return [f(i)];\n  } else {\n    var n1 = Math.ceil(n / 2);\n    return map_helper(i, i + n1 - 1, f).concat(map_helper(i + n1, j, f));\n  }\n}\n\n// recursively split input array so that we only call\n// concat a logarithmic number of times\nvar map = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(l[i]) })\n}\n\n// assumes that length l1 == length l2\nvar map2 = function(fn, l1, l2) {\n  return map_helper(0, l1.length - 1, function(i) { return fn(l1[i], l2[i]) })\n}\n\n// sugar for map(f, [0,1,...,n-1])\nvar mapN = function(fn, n) {\n  return map_helper(0, n - 1, function(i) { return fn(i) })\n}\n\nvar mapIndexed = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(i, l[i]) })\n}\n\nvar _ringAround = function(l, n) {\n  return l.slice(n).concat(l.slice(0, n));\n};\n\nvar ringForward = function(l, n) {\n  return _ringAround(l, n === undefined ? -1 : -n);\n};\n\nvar ringBackward = function(l, n) {\n  return _ringAround(l, n === undefined ? 1 : n);\n};\n\n// map through the cartesian product l1 * l2\nvar mapPairs2 = function(f, l1, l2) {\n  var res = map(function(a) {\n    return map(function(b) {\n      return f(a, b);\n    }, l2)\n  }, l1);\n  return [].concat.apply([], res); // flatten\n};\n\n// map through all 2-combinations of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], and ['b','c']\nvar mapPairsC = function(f, l) {\n  var n = l.length;\n\n  var helper = function(i) {\n    if (i === n) {\n      return [];\n    } else {\n      // compute {f(i,j)} where j \\in {i+1,...,n}\n      var r = mapN(\n          function(k) {\n            var j = i + k + 1;\n            return f(l[i], l[j])\n          },\n          n - (i + 1));\n\n      return append(r, helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// map through all 2-tuples of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], ['b','a'], ['b','c'], ['c','a'], ['c','b']\nvar mapPairsNC = function(f, l) {\n  var res = mapPairs2(function(a, b) {\n    return a === b ? undefined : f(a, b);\n  }, l, l);\n  return remove(undefined, res);\n};\n\nvar mapObject = function(fn, obj) {\n  return _.object(\n      map(\n      function(kv) {\n        return [kv[0], fn(kv[0], kv[1])]\n      },\n      _.pairs(obj))\n  );\n};\n\nvar reduce = function(fn, init, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return init\n    } else {\n      return fn(ar[i], helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// sugar for reduce(f, g(init), map(g,ar))\nvar mapReduce = function(f, init, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(init),\n                ar);\n};\n\n// sugar for reduce(f, g(last(ar)), map(g, butLast(ar)))\nvar mapReduce1 = function(f, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(ar[ar.length - 1]),\n                ar.slice(0, -1));\n};\n\nvar sum = function(l) {\n  return reduce(plus, 0, l);\n};\nvar product = function(l) {\n  return reduce(mult, 1, l);\n};\n\nvar listMean = function(l) {\n  return reduce(plus, 0, l) / l.length;\n};\nvar listVar = function(l, mu) {\n  var mu = mu === undefined ? listMean(l) : mu;\n  return mapReduce1(plus, function(a) {\n    return (a - mu) * (a - mu);\n  }, l) / l.length;\n};\nvar listStdev = function(l, mu) {\n  return Math.sqrt(listVar(l, mu));\n};\n\nvar normalize = function(xs) {\n  var Z = sum(xs);\n  return map(function(x) {\n    return x / Z;\n  }, xs);\n};\n\nvar all = function(p, l) {\n  if (l.length === 0) {\n    return true\n  } else {\n    return mapReduce1(and, p, l);\n  }\n};\n\nvar any = function(p, l) {\n  if (l.length === 0) {\n    return false\n  } else {\n    return mapReduce1(or, p, l);\n  }\n};\n\nvar zip = function(xs, ys) {\n  return map2(function(x, y) { return [x, y]},\n              xs,\n              ys)\n};\n\nvar filter = function(fn, ar) {\n  var helper = function(i, j) {\n    var n = j - i + 1;\n    if (n == 0) {\n      return [];\n    } else if (n == 1) {\n      return (fn(ar[i]) ? [ar[i]] : []);\n    } else {\n      var n1 = Math.ceil(n / 2);\n      return helper(i, i + n1 - 1).concat(helper(i + n1, j));\n    }\n  }\n\n  return helper(0, ar.length - 1)\n};\n\nvar find = function(f, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return undefined;\n    } else if (f(ar[i])) {\n      return ar[i];\n    } else {\n      return helper(i + 1);\n    }\n  }\n  return helper(0);\n};\n\nvar remove = function(a, ar) {\n  return filter(function(e) {\n    return a != e;\n  }, ar);\n};\n\nvar insertAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i));\n}\n\nvar removeAt = function(ar, i) {\n  return ar.slice(0, i).concat(ar.slice(i + 1));\n}\n\nvar replaceAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i + 1));\n}\n\nvar drop = function(n, ar) {\n  return n > ar.length ? [] : ar.slice(n);\n};\n\nvar take = function(n, ar) {\n  return n >= ar.length ? ar : ar.slice(0, n);\n};\n\nvar dropWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n  return ar.slice(helper(0));\n};\n\nvar takeWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n\n  return ar.slice(0, helper(0));\n};\n\nvar indexOf = function(x, xs) {\n  // prototype method doesn't return falsy value if not found\n  var i = xs.indexOf(x);\n  return i < 0 ? undefined : i\n};\n\nvar minWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] < _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [Infinity, Infinity]);\n};\n\nvar maxWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] > _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [-Infinity, -Infinity]);\n};\n\n// bin array into items satisfying a predicate p and items not satifying it\nvar span = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i, _ts, _fs) {\n    return (i === n ?\n            [_ts, _fs] :\n            (p(ar[i]) ?\n             helper(i + 1, snoc(_ts, ar[i]), _fs) :\n             helper(i + 1, _ts, snoc(_fs, ar[i]))));\n  };\n  return helper(0, [], []);\n};\n\n// group array items by a comparator\n// NB: there is still room for optimization here\nvar groupBy = function(cmp, ar) {\n  if (ar.length === 0) {\n    return [];\n  } else {\n    var x = ar[0];\n    var sp = span(function(b) { return cmp(x, b); }, ar.slice(1));\n    return [cons(x, sp[0])].concat(groupBy(cmp, sp[1]));\n  }\n};\n\nvar repeat = function(n, fn) {\n  var helper = function(m) {\n    if (m == 0) {\n      return [];\n    } else if (m == 1) {\n      return [fn()];\n    } else {\n      var m1 = Math.ceil(m / 2),\n          m2 = m - m1;\n      return helper(m1).concat(helper(m2));\n    }\n  }\n\n  return helper(n);\n}\n\n\nvar push = function(xs, x) {\n  return xs.concat([x]);\n};\n\nvar compose = function(f, g) {\n  return function(x) {\n    return f(g(x));\n  };\n};\n\nvar everyOther = function(l) {\n  return l.length <= 1 ? l : [l[0]].concat(everyOther(l.slice(2)));\n};\n\nvar _merge = function(l1, l2, pred, key) {\n  return (l1.length === 0 ?\n          l2 :\n          (l2.length === 0 ?\n           l1 :\n           (pred(key(l1[0]), key(l2[0])) ?\n            [l1[0]].concat(_merge(l1.slice(1), l2, pred, key)) :\n            [l2[0]].concat(_merge(l1, l2.slice(1), pred, key)))));\n};\n\nvar _sort = function(l, pred, key) {\n  return ((l.length <= 1) ?\n          l :\n          _merge(_sort(everyOther(l), pred, key),\n                 _sort(everyOther(l.slice(1)), pred, key),\n                 pred,\n                 key));\n};\n\nvar sort = function(l, pred, key) {\n  return _sort(l, (pred || lt), (key || idF));\n};\n\nvar sortOn = function(l, key, pred) {\n  return _sort(l, (pred || lt), key);\n};\n\nvar condition = function(bool) {\n  factor(bool ? 0 : -Infinity);\n};\n\nvar MH = function(wpplFn, samples, burn) {\n  return MCMC(wpplFn, { samples: samples, burn: burn });\n};\n\nvar ParticleFilter = function(wpplFn, particles) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: 0 });\n};\n\nvar ParticleFilterRejuv = function(wpplFn, particles, rejuvSteps) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: rejuvSteps });\n};\n";
-  var headerMacroModule = "operator (|>) 0 left { $val, $f } => #{ $f($val) }\nexport (|>)\n\n// mirror ad macros to work-around issue #382.\n// https://github.com/dritchie/adnn/blob/master/ad/macros.sjs\n\noperator +   14 { $r } => #{ ad.scalar.add(0, $r) }\noperator -   14 { $r } => #{ ad.scalar.sub(0, $r) }\noperator *   13 left { $l, $r } => #{ ad.scalar.mul($l, $r) }\noperator /   13 left { $l, $r } => #{ ad.scalar.div($l, $r) }\noperator %   13 left { $l, $r } => #{ ad.scalar.mod($l, $r) }\noperator +   12 left { $l, $r } => #{ ad.scalar.add($l, $r) }\noperator -   12 left { $l, $r } => #{ ad.scalar.sub($l, $r) }\noperator <   10 left { $l, $r } => #{ ad.scalar.lt($l, $r) }\noperator <=  10 left { $l, $r } => #{ ad.scalar.leq($l, $r) }\noperator >   10 left { $l, $r } => #{ ad.scalar.gt($l, $r) }\noperator >=  10 left { $l, $r } => #{ ad.scalar.geq($l, $r) }\noperator ==   9 left { $l, $r } => #{ ad.scalar.eq($l, $r) }\noperator !=   9 left { $l, $r } => #{ ad.scalar.neq($l, $r) }\noperator ===  9 left { $l, $r } => #{ ad.scalar.peq($l, $r) }\noperator !==  9 left { $l, $r } => #{ ad.scalar.pneq($l, $r) }\n\nmacro ++ {\n  rule { $r } => { $r = $r + 1 }\n  rule infix { $l | } => { $l = $l + 1 }\n}\nmacro -- {\n  rule { $r } => { $r = $r - 1 }\n  rule infix { $l | } => { $l = $l - 1 }\n}\n\nmacro += {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var + $exprVal }\n}\nmacro -= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var - $exprVal }\n}\nmacro /= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var / $exprVal }\n}\nmacro *= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var * $exprVal }\n}\n\nmacro Math {\n  rule { .$x } => { ad.scalar.$x }\n}\n\nexport +\nexport -\nexport *\nexport /\nexport <\nexport <=\nexport >\nexport >=\nexport ==\nexport !=\nexport ===\nexport !==\nexport ++\nexport --\nexport +=\nexport -=\nexport /=\nexport *=\nexport Math\n";
+  var code = "'no caching';\n\n// Distributions (note: this gets macro transformed)\n\ndefineDistConstructors(\n    Bernoulli\n    Uniform\n    UniformDrift\n    RandomInteger\n    Gaussian\n    GaussianDrift\n    MultivariateGaussian\n    Cauchy\n    Discrete\n    Gamma\n    Exponential\n    Beta\n    Binomial\n    Multinomial\n    Poisson\n    Dirichlet\n    DirichletDrift\n    Categorical\n    Delta);\n\n// Helpers to sample from distributions.\n\nvar bernoulli = function(arg) {\n  var params = dists.isParams(arg) ? arg : {p: arg};\n  return sample(Bernoulli(params));\n};\n\nvar randomInteger = function(arg) {\n  var params = dists.isParams(arg) ? arg : {n: arg};\n  return sample(RandomInteger(params));\n};\n\nvar discrete = function(arg) {\n  var params = dists.isParams(arg) ? arg : {ps: arg};\n  return sample(Discrete(params));\n};\n\nvar multinomial = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {ps: arg1, n: arg2};\n  return sample(Multinomial(params));\n};\n\nvar gaussian = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {mu: arg1, sigma: arg2};\n  return sample(Gaussian(params));\n};\n\nvar multivariateGaussian = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {mu: arg1, cov: arg2};\n  return sample(MultivariateGaussian(params));\n};\n\nvar cauchy = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {location: arg1, scale: arg2};\n  return sample(Cauchy(params));\n};\n\nvar uniform = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {a: arg1, b: arg2};\n  return sample(Uniform(params));\n};\n\nvar dirichlet = function(arg) {\n  var params = dists.isParams(arg) ? arg : {alpha: arg};\n  return sample(Dirichlet(params));\n};\n\nvar poisson = function(arg) {\n  var params = dists.isParams(arg) ? arg : {mu: arg};\n  return sample(Poisson(params));\n};\n\nvar binomial = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {p: arg1, n: arg2};\n  return sample(Binomial(params));\n};\n\nvar beta = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {a: arg1, b: arg2};\n  return sample(Beta(params));\n};\n\nvar exponential = function(arg) {\n  var params = dists.isParams(arg) ? arg : {a: arg};\n  return sample(Exponential(params));\n};\n\nvar gamma = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {shape: arg1, scale: arg2};\n  return sample(Gamma(params));\n};\n\n// Other distribution helpers\n\nvar flip = function(p) {\n  var params = {p: (p !== undefined) ? p : .5};\n  return sample(Bernoulli(params));\n};\n\nvar categorical = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {ps: arg1, vs: arg2};\n  return params.vs[discrete(params.ps)];\n};\n\nvar delta = function(arg) {\n  var params = dists.isParams(arg) ? arg : {v: arg};\n  return sample(Delta(params));\n};\n\nvar uniformDraw = function(arg) {\n  var vs = dists.isParams(arg) ? arg.vs : arg;\n  return vs[sample(RandomInteger({n: vs.length}))];\n};\n\nvar serializeDist = function(d) {\n  return dists.serialize(d);\n};\n\nvar deserializeDist = function(JSONString) {\n  return dists.deserialize(JSONString);\n};\n\nvar withImportanceDist = function(d, importanceDist) {\n  return dists.withImportanceDist(d, importanceDist);\n};\n\n// XRPs\n\nvar makeBetaBernoulli = function(pseudocounts) {\n  globalStore.BBindex = 1 + (globalStore.BBindex || 0);\n  var bbname = 'BB' + globalStore.BBindex;\n  globalStore[bbname] = pseudocounts;\n  return function() {\n    var pc = globalStore[bbname];  // get current sufficient stats\n    var val = sample(Bernoulli({p: pc[0] / (pc[0] + pc[1])}));  // sample from predictive.\n    globalStore[bbname] = [pc[0] + val, pc[1] + !val];  // update sufficient stats\n    return val;\n  };\n};\n\nvar makeDirichletDiscrete = function(pseudocounts) {\n  var addCount = function(a, i, j) {\n    var j = j || 0;\n    if (a.length === 0) {\n      return [];\n    } else {\n      return [a[0] + (i === j)].concat(addCount(a.slice(1), i, j + 1));\n    }\n  };\n  globalStore.DDindex = 1 + (globalStore.DDindex || 0);\n  var ddname = 'DD' + globalStore.DDindex;\n  globalStore[ddname] = pseudocounts;\n  return function() {\n    var pc = globalStore[ddname];  // get current sufficient stats\n    var val = sample(Discrete({ps: pc}));  // sample from predictive. (doesn't need to be normalized.)\n    globalStore[ddname] = addCount(pc, val); // update sufficient stats\n    return val;\n  };\n};\n\n// Arithmetic and other functionals\n\nvar plus = function(a, b) {\n  return a + b;\n};\nvar minus = function(a, b) {\n  return a - b;\n};\nvar mult = function(a, b) {\n  return a * b;\n};\nvar div = function(a, b) {\n  return a / b;\n};\n\nvar and = function(a, b) {\n  return a && b\n}\nvar or = function(a, b) {\n  return a || b\n}\n\nvar eq = function(a, b) {\n  return a === b;\n};\nvar neq = function(a, b) {\n  return a != b;\n};\nvar lt = function(a, b) {\n  return a < b;\n};\nvar gt = function(a, b) {\n  return a > b;\n};\nvar leq = function(a, b) {\n  return a <= b;\n};\nvar geq = function(a, b) {\n  return a >= b;\n};\n\nvar isEven = function(v) {\n  return v % 2 === 0;\n};\nvar isOdd = function(v) {\n  return v % 2 != 0;\n};\n\nvar idF = function(x) {\n  return x;\n};\nvar constF = function(f) {\n  return function() {\n    return f;\n  };\n};\nvar falseF = function() {\n  return false;\n};\nvar trueF = function() {\n  return true;\n};\n\n// Probability computations & calculations\n\nvar MAP = function(dist) {\n  return dist.MAP();\n};\n\nvar expectation = function(dist, func) {\n  var f = func || idF;\n  var supp = dist.support();\n  return mapReduce1(plus,\n                    function(s) {\n                      return Math.exp(dist.score(s)) * f(s);\n                    },\n                    supp);\n};\n\nvar entropy = function(dist) {\n  return dist.entropy();\n};\n\n// Data structures & higher-order functions\n\nvar append = function(a, b) {\n  return a.concat(b);\n};\nvar cons = function(a, b) {\n  return [a].concat(b);\n};\nvar snoc = function(a, b) {\n  return a.concat([b]);\n};\n\nvar first = function(xs) {\n  return xs[0];\n};\nvar second = function(xs) {\n  return xs[1];\n};\nvar third = function(xs) {\n  return xs[2];\n};\nvar fourth = function(xs) {\n  return xs[3];\n};\nvar secondLast = function(xs) {\n  return xs[xs.length - 2];\n};\nvar last = function(xs) {\n  return xs[xs.length - 1];\n};\n\nvar most = function(xs) {\n  return xs.slice(0, xs.length - 1);\n}\n\nvar rest = function(xs) {\n  return xs.slice(1);\n};\n\nvar map_helper = function(i, j, f) {\n  var n = j - i + 1;\n  if (n == 0) {\n    return []\n  } else if (n == 1) {\n    return [f(i)];\n  } else {\n    var n1 = Math.ceil(n / 2);\n    return map_helper(i, i + n1 - 1, f).concat(map_helper(i + n1, j, f));\n  }\n}\n\n// recursively split input array so that we only call\n// concat a logarithmic number of times\nvar map = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(l[i]) })\n}\n\n// assumes that length l1 == length l2\nvar map2 = function(fn, l1, l2) {\n  return map_helper(0, l1.length - 1, function(i) { return fn(l1[i], l2[i]) })\n}\n\n// sugar for map(f, [0,1,...,n-1])\nvar mapN = function(fn, n) {\n  return map_helper(0, n - 1, function(i) { return fn(i) })\n}\n\nvar mapIndexed = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(i, l[i]) })\n}\n\nvar _ringAround = function(l, n) {\n  return l.slice(n).concat(l.slice(0, n));\n};\n\nvar ringForward = function(l, n) {\n  return _ringAround(l, n === undefined ? -1 : -n);\n};\n\nvar ringBackward = function(l, n) {\n  return _ringAround(l, n === undefined ? 1 : n);\n};\n\n// map through the cartesian product l1 * l2\nvar mapPairs2 = function(f, l1, l2) {\n  var res = map(function(a) {\n    return map(function(b) {\n      return f(a, b);\n    }, l2)\n  }, l1);\n  return [].concat.apply([], res); // flatten\n};\n\n// map through all 2-combinations of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], and ['b','c']\nvar mapPairsC = function(f, l) {\n  var n = l.length;\n\n  var helper = function(i) {\n    if (i === n) {\n      return [];\n    } else {\n      // compute {f(i,j)} where j \\in {i+1,...,n}\n      var r = mapN(\n          function(k) {\n            var j = i + k + 1;\n            return f(l[i], l[j])\n          },\n          n - (i + 1));\n\n      return append(r, helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// map through all 2-tuples of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], ['b','a'], ['b','c'], ['c','a'], ['c','b']\nvar mapPairsNC = function(f, l) {\n  var res = mapPairs2(function(a, b) {\n    return a === b ? undefined : f(a, b);\n  }, l, l);\n  return remove(undefined, res);\n};\n\nvar mapObject = function(fn, obj) {\n  return _.object(\n      map(\n      function(kv) {\n        return [kv[0], fn(kv[0], kv[1])]\n      },\n      _.pairs(obj))\n  );\n};\n\nvar reduce = function(fn, init, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return init\n    } else {\n      return fn(ar[i], helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// sugar for reduce(f, g(init), map(g,ar))\nvar mapReduce = function(f, init, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(init),\n                ar);\n};\n\n// sugar for reduce(f, g(last(ar)), map(g, butLast(ar)))\nvar mapReduce1 = function(f, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(ar[ar.length - 1]),\n                ar.slice(0, -1));\n};\n\nvar sum = function(l) {\n  return reduce(plus, 0, l);\n};\nvar product = function(l) {\n  return reduce(mult, 1, l);\n};\n\nvar listMean = function(l) {\n  return reduce(plus, 0, l) / l.length;\n};\nvar listVar = function(l, mu) {\n  var mu = mu === undefined ? listMean(l) : mu;\n  return mapReduce1(plus, function(a) {\n    return (a - mu) * (a - mu);\n  }, l) / l.length;\n};\nvar listStdev = function(l, mu) {\n  return Math.sqrt(listVar(l, mu));\n};\n\nvar normalize = function(xs) {\n  var Z = sum(xs);\n  return map(function(x) {\n    return x / Z;\n  }, xs);\n};\n\nvar all = function(p, l) {\n  if (l.length === 0) {\n    return true\n  } else {\n    return mapReduce1(and, p, l);\n  }\n};\n\nvar any = function(p, l) {\n  if (l.length === 0) {\n    return false\n  } else {\n    return mapReduce1(or, p, l);\n  }\n};\n\nvar zip = function(xs, ys) {\n  return map2(function(x, y) { return [x, y]},\n              xs,\n              ys)\n};\n\nvar filter = function(fn, ar) {\n  var helper = function(i, j) {\n    var n = j - i + 1;\n    if (n == 0) {\n      return [];\n    } else if (n == 1) {\n      return (fn(ar[i]) ? [ar[i]] : []);\n    } else {\n      var n1 = Math.ceil(n / 2);\n      return helper(i, i + n1 - 1).concat(helper(i + n1, j));\n    }\n  }\n\n  return helper(0, ar.length - 1)\n};\n\nvar find = function(f, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return undefined;\n    } else if (f(ar[i])) {\n      return ar[i];\n    } else {\n      return helper(i + 1);\n    }\n  }\n  return helper(0);\n};\n\nvar remove = function(a, ar) {\n  return filter(function(e) {\n    return a != e;\n  }, ar);\n};\n\nvar insertAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i));\n}\n\nvar removeAt = function(ar, i) {\n  return ar.slice(0, i).concat(ar.slice(i + 1));\n}\n\nvar replaceAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i + 1));\n}\n\nvar drop = function(n, ar) {\n  return n > ar.length ? [] : ar.slice(n);\n};\n\nvar take = function(n, ar) {\n  return n >= ar.length ? ar : ar.slice(0, n);\n};\n\nvar dropWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n  return ar.slice(helper(0));\n};\n\nvar takeWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n\n  return ar.slice(0, helper(0));\n};\n\nvar indexOf = function(x, xs) {\n  // prototype method doesn't return falsy value if not found\n  var i = xs.indexOf(x);\n  return i < 0 ? undefined : i\n};\n\nvar minWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] < _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [Infinity, Infinity]);\n};\n\nvar maxWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] > _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [-Infinity, -Infinity]);\n};\n\n// bin array into items satisfying a predicate p and items not satifying it\nvar span = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i, _ts, _fs) {\n    return (i === n ?\n            [_ts, _fs] :\n            (p(ar[i]) ?\n             helper(i + 1, snoc(_ts, ar[i]), _fs) :\n             helper(i + 1, _ts, snoc(_fs, ar[i]))));\n  };\n  return helper(0, [], []);\n};\n\n// group array items by a comparator\n// NB: there is still room for optimization here\nvar groupBy = function(cmp, ar) {\n  if (ar.length === 0) {\n    return [];\n  } else {\n    var x = ar[0];\n    var sp = span(function(b) { return cmp(x, b); }, ar.slice(1));\n    return [cons(x, sp[0])].concat(groupBy(cmp, sp[1]));\n  }\n};\n\nvar repeat = function(n, fn) {\n  var helper = function(m) {\n    if (m == 0) {\n      return [];\n    } else if (m == 1) {\n      return [fn()];\n    } else {\n      var m1 = Math.ceil(m / 2),\n          m2 = m - m1;\n      return helper(m1).concat(helper(m2));\n    }\n  }\n\n  return helper(n);\n}\n\n\nvar push = function(xs, x) {\n  return xs.concat([x]);\n};\n\nvar compose = function(f, g) {\n  return function(x) {\n    return f(g(x));\n  };\n};\n\nvar everyOther = function(l) {\n  return l.length <= 1 ? l : [l[0]].concat(everyOther(l.slice(2)));\n};\n\nvar _merge = function(l1, l2, pred, key) {\n  return (l1.length === 0 ?\n          l2 :\n          (l2.length === 0 ?\n           l1 :\n           (pred(key(l1[0]), key(l2[0])) ?\n            [l1[0]].concat(_merge(l1.slice(1), l2, pred, key)) :\n            [l2[0]].concat(_merge(l1, l2.slice(1), pred, key)))));\n};\n\nvar _sort = function(l, pred, key) {\n  return ((l.length <= 1) ?\n          l :\n          _merge(_sort(everyOther(l), pred, key),\n                 _sort(everyOther(l.slice(1)), pred, key),\n                 pred,\n                 key));\n};\n\nvar sort = function(l, pred, key) {\n  return _sort(l, (pred || lt), (key || idF));\n};\n\nvar sortOn = function(l, key, pred) {\n  return _sort(l, (pred || lt), key);\n};\n\nvar condition = function(bool) {\n  factor(bool ? 0 : -Infinity);\n};\n\nvar MH = function(wpplFn, samples, burn) {\n  return MCMC(wpplFn, { samples: samples, burn: burn });\n};\n\nvar ParticleFilter = function(wpplFn, particles) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: 0 });\n};\n\nvar ParticleFilterRejuv = function(wpplFn, particles, rejuvSteps) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: rejuvSteps });\n};\n\nvar Infer = function(options, wpplFn) {\n  if (!util.isObject(options)) {\n    util.fatal('Infer: expected first argument to be an options object.');\n  }\n  if (!_.isFunction(wpplFn)) {\n    util.fatal('Infer: expected second argument to be a function.');\n  }\n\n  // Map from camelCase options to PascalCase coroutine names. Also\n  // used to ensure the supplied method name is a valid inference\n  // routine.\n  var methodMap = {\n    SMC: SMC,\n    MCMC: MCMC,\n    PMCMC: PMCMC,\n    asyncPF: AsyncPF,\n    rejection: Rejection,\n    enumerate: Enumerate,\n    incrementalMH: IncrementalMH\n  };\n\n  var methodName = options.method;\n  if (methodName === undefined) {\n    util.fatal('Infer: the \\'method\\' option must be specified.');\n  }\n  if (!_.has(methodMap, methodName)) {\n    util.fatal('Infer: unknown method \\'' + methodName + '\\'.');\n  }\n  var method = methodMap[methodName];\n  return method(wpplFn, _.omit(options, 'method'));\n};\n";
+  var headerMacroModule = "operator (|>) 0 left { $val, $f } => #{ $f($val) }\nexport (|>)\n\nmacro defineDistConstructors {\n  rule { ($name ...) } => {\n    $(\n      var $name = function(params) {\n        return util.jsnew(dists.$name, params);\n      };\n    ) ...\n  }\n}\n\nexport defineDistConstructors\n\n// mirror ad macros to work-around issue #382.\n// https://github.com/dritchie/adnn/blob/master/ad/macros.sjs\n\noperator +   14 { $r } => #{ ad.scalar.add(0, $r) }\noperator -   14 { $r } => #{ ad.scalar.sub(0, $r) }\noperator *   13 left { $l, $r } => #{ ad.scalar.mul($l, $r) }\noperator /   13 left { $l, $r } => #{ ad.scalar.div($l, $r) }\noperator %   13 left { $l, $r } => #{ ad.scalar.mod($l, $r) }\noperator +   12 left { $l, $r } => #{ ad.scalar.add($l, $r) }\noperator -   12 left { $l, $r } => #{ ad.scalar.sub($l, $r) }\noperator <   10 left { $l, $r } => #{ ad.scalar.lt($l, $r) }\noperator <=  10 left { $l, $r } => #{ ad.scalar.leq($l, $r) }\noperator >   10 left { $l, $r } => #{ ad.scalar.gt($l, $r) }\noperator >=  10 left { $l, $r } => #{ ad.scalar.geq($l, $r) }\noperator ==   9 left { $l, $r } => #{ ad.scalar.eq($l, $r) }\noperator !=   9 left { $l, $r } => #{ ad.scalar.neq($l, $r) }\noperator ===  9 left { $l, $r } => #{ ad.scalar.peq($l, $r) }\noperator !==  9 left { $l, $r } => #{ ad.scalar.pneq($l, $r) }\n\nmacro ++ {\n  rule { $r } => { $r = $r + 1 }\n  rule infix { $l | } => { $l = $l + 1 }\n}\nmacro -- {\n  rule { $r } => { $r = $r - 1 }\n  rule infix { $l | } => { $l = $l - 1 }\n}\n\nmacro += {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var + $exprVal }\n}\nmacro -= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var - $exprVal }\n}\nmacro /= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var / $exprVal }\n}\nmacro *= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var * $exprVal }\n}\n\nmacro Math {\n  rule { .$x } => { ad.scalar.$x }\n}\n\nexport +\nexport -\nexport *\nexport /\nexport <\nexport <=\nexport >\nexport >=\nexport ==\nexport !=\nexport ===\nexport !==\nexport ++\nexport --\nexport +=\nexport -=\nexport /=\nexport *=\nexport Math\n";
   return { wppl: [{ code: code, filename: 'header.wppl' }], macros: [headerMacroModule] };
 }
 
@@ -61864,6 +62370,23 @@ function copyAst(ast) {
   return ret;
 }
 
+function generateCodeAndMap(code, filename, bundles, ast) {
+  var codeAndMap = escodegen.generate(ast, {
+    sourceMap: true,
+    sourceMapWithCode: true
+  });
+
+  var sourceMap = JSON.parse(codeAndMap.map);
+  // Embed the original source in the source map for later use in
+  // error handling.
+  sourceMap.sourcesContent = sourceMap.sources.map(function(fn) {
+    return (fn === filename) ? code : _.findWhere(bundles, {filename: fn}).code;
+  });
+  codeAndMap.map = sourceMap;
+
+  return codeAndMap;
+}
+
 function compile(code, options) {
   options = util.mergeDefaults(options, {
     verbose: false,
@@ -61876,10 +62399,10 @@ function compile(code, options) {
   var transforms = options.transforms || [
     thunkify,
     naming,
+    varargs,
     cps,
     store,
     optimize,
-    varargs,
     trampoline
   ];
 
@@ -61887,45 +62410,66 @@ function compile(code, options) {
     var macros = _.chain(bundles).pluck('macros').flatten().uniq().value();
     var programAst = parse(code, macros, options.filename);
     var asts = _.pluck(bundles, 'ast').map(copyAst).concat(programAst);
-    var doCaching = _.any(asts, caching.transformRequired);
+    assert.strictEqual(bundles[0].filename, 'header.wppl');
+    var doCaching = _.any(asts.slice(1), caching.transformRequired);
 
     if (options.verbose && doCaching) {
       console.log('Caching transform will be applied.');
     }
+
+    var generateCode = _.partial(generateCodeAndMap, code, options.filename, bundles);
 
     return util.pipeline([
       doCaching ? applyCaching : _.identity,
       concatPrograms,
       doCaching ? freevars : _.identity,
       util.pipeline(transforms),
-      options.generateCode ? escodegen.generate : _.identity
+      options.generateCode ? generateCode : _.identity
     ])(asts);
   };
 
   return util.timeif(options.verbose, 'compile', _compile);
 }
 
+function addSourceMap(error, sourceMap) {
+  if (error instanceof Error) {
+    if (error.sourceMaps === undefined) {
+      error.sourceMaps = [];
+    }
+    error.sourceMaps.push(sourceMap);
+  }
+}
 
 function run(code, k, options) {
   options = _.defaults(options || {},
                        {runner: util.runningInBrowser() ? 'web' : 'cli'});
 
-  var runner = util.trampolineRunners[options.runner];
-  var compiledCode = compile(code, options);
+  var codeWithMap = compile(code, options);
+
+  var runner = util.trampolineRunners[options.runner](function(e) {
+    addSourceMap(e, codeWithMap.map);
+    throw e;
+  });
 
   util.timeif(options.verbose, 'run', function() {
-    eval.call(global, compiledCode)(runner)({}, k, '');
+    eval.call(global, codeWithMap.code)(runner)({}, k, '');
   });
 }
 
 // Make webppl eval available within webppl
 // runner is one of 'cli','web'
-global.webpplEval = function(s, k, a, code, runner) {
-  if (runner === undefined) {
-    runner = util.runningInBrowser() ? 'web' : 'cli'
+global.webpplEval = function(s, k, a, code, runnerName) {
+  if (runnerName === undefined) {
+    runnerName = util.runningInBrowser() ? 'web' : 'cli'
   }
-  var compiledCode = compile(code);
-  return eval.call(global, compiledCode)(util.trampolineRunners[runner])(s, k, a);
+  var codeWithMap = compile(code, {filename: 'webppl:eval'});
+
+  var runner = util.trampolineRunners[runnerName](function(e) {
+    addSourceMap(e, codeWithMap.map);
+    throw e;
+  });
+
+  return eval.call(global, codeWithMap.code)(runner)(s, k, a);
 };
 
 module.exports = {
@@ -61938,7 +62482,7 @@ module.exports = {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./analysis/main":157,"./header":164,"./syntax":180,"./transforms/caching":182,"./transforms/cps":183,"./transforms/freevars":184,"./transforms/naming":185,"./transforms/optimize":186,"./transforms/store":187,"./transforms/trampoline":188,"./transforms/varargs":189,"./util":190,"assert":192,"ast-types":26,"escodegen":27,"esprima":97,"fs":191,"sweet.js":123,"underscore":151}],179:[function(require,module,exports){
+},{"./analysis/main":157,"./header":164,"./syntax":180,"./transforms/addFilename":182,"./transforms/caching":184,"./transforms/cps":185,"./transforms/freevars":186,"./transforms/naming":187,"./transforms/optimize":188,"./transforms/store":189,"./transforms/trampoline":190,"./transforms/varargs":191,"./util":192,"assert":194,"ast-types":26,"escodegen":27,"esprima":97,"fs":193,"sweet.js":123,"underscore":151}],179:[function(require,module,exports){
 'use strict';
 
 // Inference query table
@@ -62109,7 +62653,7 @@ function isPrimitive(node) {
           (!node.computed) && types.Identifier.check(node.property));
     default:
       console.log(node);
-      throw "isPrimitive doesn't handle node";
+      throw new Error("isPrimitive doesn't handle node");
   }
 }
 
@@ -62142,12 +62686,12 @@ module.exports = {
   isPrimitive: isPrimitive
 };
 
-},{"./util":190,"ast-types":26,"estraverse":98}],181:[function(require,module,exports){
+},{"./util":192,"ast-types":26,"estraverse":98}],181:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
 var assert = require('assert');
-var isErp = require('./erp').isErp;
+var isDist = require('./dists').isDist;
 var ad = require('./ad');
 
 var Trace = function(wpplFn, s, k, a) {
@@ -62195,12 +62739,11 @@ Trace.prototype.continue = function() {
   }
 };
 
-Trace.prototype.addChoice = function(erp, params, val, address, store, continuation) {
+Trace.prototype.addChoice = function(dist, val, address, store, continuation) {
   // Called at sample statements.
   // Adds the choice to the DB and updates current score.
 
-  // assert(isErp(erp));
-  // assert(_.isUndefined(params) || _.isArray(params));
+  // assert(isDist(dist));
   // assert(_.isString(address));
   // assert(_.isObject(store));
   // assert(_.isFunction(continuation));
@@ -62208,8 +62751,7 @@ Trace.prototype.addChoice = function(erp, params, val, address, store, continuat
   var choice = {
     k: continuation,
     address: address,
-    erp: erp,
-    params: params,
+    dist: dist,
     // Record the score without adding the choiceScore. This is the score we'll
     // need if we regen from this choice.
     score: this.score,
@@ -62221,7 +62763,7 @@ Trace.prototype.addChoice = function(erp, params, val, address, store, continuat
   this.choices.push(choice);
   this.addressMap[address] = choice;
   this.length += 1;
-  this.score = ad.scalar.add(this.score, erp.score(params, val));
+  this.score = ad.scalar.add(this.score, dist.score(val));
   // this.checkConsistency();
 };
 
@@ -62283,7 +62825,51 @@ Trace.prototype.checkConsistency = function() {
 
 module.exports = Trace;
 
-},{"./ad":152,"./erp":162,"assert":192,"underscore":151}],182:[function(require,module,exports){
+},{"./ad":152,"./dists":162,"assert":194,"underscore":151}],182:[function(require,module,exports){
+var replace = require('estraverse').replace;
+
+function addFilenameMain(ast, filename) {
+  return replace(ast, {
+    enter: function(node) {
+      node.loc.source = filename;
+      return node;
+    }
+  });
+}
+
+module.exports = {
+  addFilename: addFilenameMain
+};
+
+},{"estraverse":98}],183:[function(require,module,exports){
+var builders = require('ast-types').builders;
+var _ = require('underscore');
+
+// The ast-type builders don't provide a convenient way to set the
+// source location of a built node. As a work-around, we wrap each
+// builder function with a new function that takes the source location
+// as an extra argument and adds it to the new node. The source
+// location argument is optional, and is given as the final argument
+// when present.
+
+function isLocationNode(node) {
+  return _.has(node, 'start') && _.has(node, 'end');
+}
+
+module.exports = _.mapObject(builders, function(builder) {
+  return function() {
+    var args = _.toArray(arguments);
+    if (args.length > 0 && isLocationNode(_.last(args))) {
+      var node = builder.apply(null, args.slice(0, -1));
+      node.loc = _.last(args);
+      return node;
+    } else {
+      return builder.apply(null, args);
+    }
+  };
+});
+
+},{"ast-types":26,"underscore":151}],184:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
@@ -62313,21 +62899,22 @@ var cacheExempt = [
   'sampleWithFactor'
 ];
 var cacheExemptTable = {};
-_.each(cacheExempt, function(erpname) {
-  cacheExemptTable[erpname] = true;
+_.each(cacheExempt, function(funcName) {
+  cacheExemptTable[funcName] = true;
 });
 cacheExempt = cacheExemptTable;
 
 function shouldCache(callee) {
-  // Don't cache 'primitive' functions. It actually could be benficial to cache
+  // Don't cache 'primitive' functions. It actually could be beneficial to cache
   //    these in some cases, but correctly binding 'this' will require some
   //    systemic changes that I don't want to deal with right now.
   if (isPrimitive(callee))
     return false;
-  // Don't cache ERPs or other coroutine functions that deal with ERPs.
+  // Don't cache sampling helpers or other coroutine functions that
+  // deal with distributions.
   // Why do this? If the cache adaptation decides to remove one of these functions,
-  //    then that function will have the same address as the ERP it's dealing with,
-  //    so the adapter will also try to remove the ERP.
+  //    then that function will have the same address as the distribution it's dealing with,
+  //    so the adapter will also try to remove the distribution.
   // Basically, a core assumption of IncrementalMH is that all cache nodes have unique
   //    addresses.
   if (callee.type === Syntax.Identifier && cacheExempt[callee.name])
@@ -62353,11 +62940,23 @@ function cachingMain(node) {
   return estraverse.replace(node, { leave: exit });
 }
 
+
+function isImhIdentifier(node) {
+  return node.type === 'Identifier' && node.name === 'IncrementalMH';
+}
+
+function isImhInferMethodOption(node) {
+  return node.type === 'Property' &&
+      ((node.key.type === 'Identifier' && node.key.name === 'method') ||
+      (node.key.type === 'Literal' && node.key.value === 'method')) &&
+      (node.value.type === 'Literal' && node.value.value === 'incrementalMH');
+}
+
 function transformRequired(programAST) {
   var flag = false;
   estraverse.traverse(programAST, {
     enter: function(node) {
-      if (node.type === 'Identifier' && node.name === 'IncrementalMH') {
+      if (isImhIdentifier(node) || isImhInferMethodOption(node)) {
         flag = true;
         this.break();
       }
@@ -62379,11 +62978,11 @@ module.exports = {
   hasNoCachingDirective: hasNoCachingDirective
 };
 
-},{"../syntax":180,"ast-types":26,"estraverse":98,"underscore":151}],183:[function(require,module,exports){
+},{"../syntax":180,"ast-types":26,"estraverse":98,"underscore":151}],185:[function(require,module,exports){
 'use strict';
 
 var assert = require('assert');
-var build = require('ast-types').builders;
+var build = require('./builders');
 var types = require('ast-types').namedTypes;
 var Syntax = require('estraverse').Syntax;
 
@@ -62503,7 +63102,7 @@ function atomize(node, metaK) {
     clause(Syntax.MemberExpression, function(object, property) {
       return atomize(object, function(object) {
         return atomize(property, function(property) {
-          return metaK(build.memberExpression(object, property, node.computed));
+          return metaK(build.memberExpression(object, property, node.computed, node.loc));
         });
       });
     }),
@@ -62720,7 +63319,7 @@ module.exports = {
   cps: cpsMain
 };
 
-},{"../syntax":180,"assert":192,"ast-types":26,"estraverse":98}],184:[function(require,module,exports){
+},{"../syntax":180,"./builders":183,"assert":194,"ast-types":26,"estraverse":98}],186:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
@@ -62830,7 +63429,7 @@ module.exports = {
   freevars: freevarsMain
 };
 
-},{"../util":190,"ast-types":26,"estraverse":98,"underscore":151}],185:[function(require,module,exports){
+},{"../util":192,"ast-types":26,"estraverse":98,"underscore":151}],187:[function(require,module,exports){
 'use strict';
 
 var Syntax = require('estraverse').Syntax;
@@ -62906,7 +63505,7 @@ module.exports = {
   naming: namingMain
 };
 
-},{"../syntax":180,"../util":190,"ast-types":26,"estraverse":98}],186:[function(require,module,exports){
+},{"../syntax":180,"../util":192,"ast-types":26,"estraverse":98}],188:[function(require,module,exports){
 'use strict';
 
 var esmangle = require('esmangle');
@@ -63038,7 +63637,7 @@ module.exports = {
   optimize: optimizeMain
 };
 
-},{"../syntax":180,"ast-types":26,"esmangle":44,"estraverse":98}],187:[function(require,module,exports){
+},{"../syntax":180,"ast-types":26,"esmangle":44,"estraverse":98}],189:[function(require,module,exports){
 'use strict';
 
 var estraverse = require('estraverse');
@@ -63086,7 +63685,7 @@ module.exports = {
   store: storeMain
 };
 
-},{"../syntax":180,"ast-types":26,"estraverse":98}],188:[function(require,module,exports){
+},{"../syntax":180,"ast-types":26,"estraverse":98}],190:[function(require,module,exports){
 'use strict';
 
 var replace = require('estraverse').replace;
@@ -63163,7 +63762,7 @@ module.exports = {
   trampoline: trampolineMain
 };
 
-},{"../syntax":180,"../util":190,"ast-types":26,"esprima":97,"estraverse":98,"underscore":151}],189:[function(require,module,exports){
+},{"../syntax":180,"../util":192,"ast-types":26,"esprima":97,"estraverse":98,"underscore":151}],191:[function(require,module,exports){
 'use strict';
 
 var assert = require('assert');
@@ -63179,31 +63778,29 @@ function makeArgumentsIdentifier() {
   return '_arguments' + argumentsIdCounter;
 }
 
-function findEnclosingFunctionNode(node) {
-  var ancestor = node;
-  while (ancestor !== undefined) {
-    if (ancestor.type === 'FunctionExpression') {
-      break;
-    }
-    ancestor = ancestor.parentNode;
+var fnStack = [];
+
+function pushFn(node) {
+  if (node.type === Syntax.FunctionExpression) {
+    fnStack.push(node);
   }
-  if (ancestor === undefined) {
-    throw 'Used "arguments" outside of function context!';
-  }
-  return ancestor;
 }
 
-function addParents(node, parent) {
-  node.parentNode = parent;
-  return node;
+function popFn(node) {
+  if (node.type === Syntax.FunctionExpression) {
+    assert.strictEqual(node, fnStack[fnStack.length - 1]);
+    fnStack.pop();
+  }
+}
+
+function getEnclosingFunctionNode() {
+  if (fnStack.length === 0) {
+    throw new Error('Used "arguments" outside of function context!');
+  }
+  return fnStack[fnStack.length - 1];
 }
 
 function varargs(node) {
-
-  if (node.seenByVarargs) {
-    return node;
-  }
-  node.seenByVarargs = true;
 
   switch (node.type) {
 
@@ -63213,7 +63810,7 @@ function varargs(node) {
       if (node.name !== 'arguments') {
         return node;
       }
-      var functionNode = findEnclosingFunctionNode(node);
+      var functionNode = getEnclosingFunctionNode();
       var argumentsId = functionNode.argumentsId || makeArgumentsIdentifier();
       node.name = argumentsId;
       if (functionNode.argumentsId === undefined) {
@@ -63231,13 +63828,19 @@ function varargs(node) {
 
   }
 
+
 }
 
 function varargsMain(node) {
   node = estraverse.replace(
       node, {
-        enter: addParents,
-        leave: varargs
+        enter: function(node) {
+          pushFn(node);
+          return varargs(node);
+        },
+        leave: function(node) {
+          popFn(node);
+        }
       });
   return node;
 }
@@ -63246,7 +63849,7 @@ module.exports = {
   varargs: varargsMain
 };
 
-},{"assert":192,"ast-types":26,"esprima":97,"estraverse":98}],190:[function(require,module,exports){
+},{"assert":194,"ast-types":26,"esprima":97,"estraverse":98}],192:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -63256,30 +63859,49 @@ var seedrandom = require('seedrandom');
 
 var rng = Math.random;
 
-var trampolineRunners = {
-  web: function f(t) {
-    var lastPauseTime = Date.now();
-
-    if (f.__cancel__) {
-      f.__cancel__ = false;
-    } else {
-      while (t) {
-        var currTime = Date.now();
-        if (currTime - lastPauseTime > 100) {
-          // NB: return is crucial here as it exits the while loop
-          // and i'm using return rather than break because we might
-          // one day want to cancel the timer
-          return setTimeout(function() { f(t) }, 0);
-        } else {
-          t = t();
-        }
+function withErrorHandling(handler, f) {
+  return function(x) {
+    try {
+      return f(x);
+    } catch (e) {
+      if (handler) {
+        handler(e);
+      } else {
+        throw e;
       }
     }
+  };
+}
+
+var trampolineRunners = {
+  web: function(handler) {
+    var f = withErrorHandling(handler, function(t) {
+      var lastPauseTime = Date.now();
+
+      if (f.__cancel__) {
+        f.__cancel__ = false;
+      } else {
+        while (t) {
+          var currTime = Date.now();
+          if (currTime - lastPauseTime > 100) {
+            // NB: return is crucial here as it exits the while loop
+            // and i'm using return rather than break because we might
+            // one day want to cancel the timer
+            return setTimeout(function() { f(t) }, 0);
+          } else {
+            t = t();
+          }
+        }
+      }
+    });
+    return f;
   },
-  cli: function(t) {
-    while (t) {
-      t = t()
-    }
+  cli: function(handler) {
+    return withErrorHandling(handler, function(t) {
+      while (t) {
+        t = t()
+      }
+    });
   }
 }
 
@@ -63413,20 +64035,33 @@ function histStd(hist) {
   }));
 }
 
-function histsApproximatelyEqual(actualHist, expectedHist, tolerance) {
-  var allOk = (expectedHist !== undefined);
-  _.each(
-      expectedHist,
-      function(expectedValue, key) {
-        var value = actualHist[key] || 0;
-        var testPassed = Math.abs(value - expectedValue) <= tolerance;
-        allOk = allOk && testPassed;
-      });
-  return allOk;
+function sameKeys(obj1, obj2) {
+  return _.size(obj1) === _.size(obj2) &&
+      _.all(_.keys(obj1), function(key) { return _.has(obj2, key); });
+}
+
+function histsApproximatelyEqual(actualHist, expectedHist, tolerance, exactSupport) {
+  if (expectedHist === undefined || actualHist === undefined) {
+    return false;
+  }
+  if (exactSupport && !sameKeys(actualHist, expectedHist)) {
+    return false;
+  }
+  return _.all(expectedHist, function(expectedValue, key) {
+    var value = actualHist[key] || 0;
+    return Math.abs(value - expectedValue) <= tolerance;
+  });
 }
 
 function mergeDefaults(options, defaults) {
   return _.defaults(options ? _.clone(options) : {}, defaults);
+}
+
+function throwUnlessOpts(options, fnName) {
+  assert.ok(fnName);
+  if (options !== undefined && !_.isObject(options)) {
+    throw fnName + ' expected an options object but received: ' + JSON.stringify(options);
+  }
 }
 
 function InfToJSON(k, v) {
@@ -63482,6 +64117,19 @@ function warn(msg) {
   }
 }
 
+function fatal(msg) {
+  throw msg;
+}
+
+function jsnew(ctor, arg) {
+  return new ctor(arg);
+}
+
+// Unlike _.isObject this returns false for arrays and functions.
+function isObject(x) {
+  return x !== undefined && Object.getPrototypeOf(x) === Object.prototype;
+}
+
 module.exports = {
   trampolineRunners: trampolineRunners,
   random: random,
@@ -63501,6 +64149,7 @@ module.exports = {
   prettyJSON: prettyJSON,
   runningInBrowser: runningInBrowser,
   mergeDefaults: mergeDefaults,
+  throwUnlessOpts: throwUnlessOpts,
   sum: sum,
   product: product,
   asArray: asArray,
@@ -63508,13 +64157,16 @@ module.exports = {
   deserialize: deserialize,
   timeif: timeif,
   pipeline: pipeline,
-  warn: warn
+  warn: warn,
+  fatal: fatal,
+  jsnew: jsnew,
+  isObject: isObject
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"assert":192,"seedrandom":111,"underscore":151}],191:[function(require,module,exports){
+},{"assert":194,"seedrandom":111,"underscore":151}],193:[function(require,module,exports){
 
-},{}],192:[function(require,module,exports){
+},{}],194:[function(require,module,exports){
 // http://wiki.commonjs.org/wiki/Unit_Testing/1.0
 //
 // THIS IS NOT TESTED NOR LIKELY TO WORK OUTSIDE V8!
@@ -63875,9 +64527,9 @@ var objectKeys = Object.keys || function (obj) {
   return keys;
 };
 
-},{"util/":406}],193:[function(require,module,exports){
-arguments[4][191][0].apply(exports,arguments)
-},{"dup":191}],194:[function(require,module,exports){
+},{"util/":408}],195:[function(require,module,exports){
+arguments[4][193][0].apply(exports,arguments)
+},{"dup":193}],196:[function(require,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -65423,7 +66075,7 @@ function blitBuffer (src, dst, offset, length) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":195,"ieee754":196,"is-array":197}],195:[function(require,module,exports){
+},{"base64-js":197,"ieee754":198,"is-array":199}],197:[function(require,module,exports){
 var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 ;(function (exports) {
@@ -65549,7 +66201,7 @@ var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 	exports.fromByteArray = uint8ToBase64
 }(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
 
-},{}],196:[function(require,module,exports){
+},{}],198:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -65635,7 +66287,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],197:[function(require,module,exports){
+},{}],199:[function(require,module,exports){
 
 /**
  * isArray
@@ -65670,7 +66322,7 @@ module.exports = isArray || function (val) {
   return !! val && '[object Array]' == str.call(val);
 };
 
-},{}],198:[function(require,module,exports){
+},{}],200:[function(require,module,exports){
 'use strict'
 
 exports.randomBytes = exports.rng = exports.pseudoRandomBytes = exports.prng = require('randombytes')
@@ -65749,7 +66401,7 @@ var publicEncrypt = require('public-encrypt')
   }
 })
 
-},{"browserify-cipher":199,"browserify-sign":229,"browserify-sign/algos":228,"create-ecdh":293,"create-hash":316,"create-hmac":329,"diffie-hellman":330,"pbkdf2":337,"public-encrypt":338,"randombytes":383}],199:[function(require,module,exports){
+},{"browserify-cipher":201,"browserify-sign":231,"browserify-sign/algos":230,"create-ecdh":295,"create-hash":318,"create-hmac":331,"diffie-hellman":332,"pbkdf2":339,"public-encrypt":340,"randombytes":385}],201:[function(require,module,exports){
 var ebtk = require('evp_bytestokey')
 var aes = require('browserify-aes/browser')
 var DES = require('browserify-des')
@@ -65824,7 +66476,7 @@ function getCiphers () {
 }
 exports.listCiphers = exports.getCiphers = getCiphers
 
-},{"browserify-aes/browser":202,"browserify-aes/modes":206,"browserify-des":217,"browserify-des/modes":218,"evp_bytestokey":227}],200:[function(require,module,exports){
+},{"browserify-aes/browser":204,"browserify-aes/modes":208,"browserify-des":219,"browserify-des/modes":220,"evp_bytestokey":229}],202:[function(require,module,exports){
 (function (Buffer){
 // based on the aes implimentation in triple sec
 // https://github.com/keybase/triplesec
@@ -66005,7 +66657,7 @@ AES.prototype._doCryptBlock = function (M, keySchedule, SUB_MIX, SBOX) {
 exports.AES = AES
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],201:[function(require,module,exports){
+},{"buffer":196}],203:[function(require,module,exports){
 (function (Buffer){
 var aes = require('./aes')
 var Transform = require('cipher-base')
@@ -66106,7 +66758,7 @@ function xorTest (a, b) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":200,"./ghash":205,"buffer":194,"buffer-xor":214,"cipher-base":215,"inherits":385}],202:[function(require,module,exports){
+},{"./aes":202,"./ghash":207,"buffer":196,"buffer-xor":216,"cipher-base":217,"inherits":387}],204:[function(require,module,exports){
 var ciphers = require('./encrypter')
 exports.createCipher = exports.Cipher = ciphers.createCipher
 exports.createCipheriv = exports.Cipheriv = ciphers.createCipheriv
@@ -66119,7 +66771,7 @@ function getCiphers () {
 }
 exports.listCiphers = exports.getCiphers = getCiphers
 
-},{"./decrypter":203,"./encrypter":204,"./modes":206}],203:[function(require,module,exports){
+},{"./decrypter":205,"./encrypter":206,"./modes":208}],205:[function(require,module,exports){
 (function (Buffer){
 var aes = require('./aes')
 var Transform = require('cipher-base')
@@ -66259,7 +66911,7 @@ exports.createDecipher = createDecipher
 exports.createDecipheriv = createDecipheriv
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":200,"./authCipher":201,"./modes":206,"./modes/cbc":207,"./modes/cfb":208,"./modes/cfb1":209,"./modes/cfb8":210,"./modes/ctr":211,"./modes/ecb":212,"./modes/ofb":213,"./streamCipher":216,"buffer":194,"cipher-base":215,"evp_bytestokey":227,"inherits":385}],204:[function(require,module,exports){
+},{"./aes":202,"./authCipher":203,"./modes":208,"./modes/cbc":209,"./modes/cfb":210,"./modes/cfb1":211,"./modes/cfb8":212,"./modes/ctr":213,"./modes/ecb":214,"./modes/ofb":215,"./streamCipher":218,"buffer":196,"cipher-base":217,"evp_bytestokey":229,"inherits":387}],206:[function(require,module,exports){
 (function (Buffer){
 var aes = require('./aes')
 var Transform = require('cipher-base')
@@ -66384,7 +67036,7 @@ exports.createCipheriv = createCipheriv
 exports.createCipher = createCipher
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":200,"./authCipher":201,"./modes":206,"./modes/cbc":207,"./modes/cfb":208,"./modes/cfb1":209,"./modes/cfb8":210,"./modes/ctr":211,"./modes/ecb":212,"./modes/ofb":213,"./streamCipher":216,"buffer":194,"cipher-base":215,"evp_bytestokey":227,"inherits":385}],205:[function(require,module,exports){
+},{"./aes":202,"./authCipher":203,"./modes":208,"./modes/cbc":209,"./modes/cfb":210,"./modes/cfb1":211,"./modes/cfb8":212,"./modes/ctr":213,"./modes/ecb":214,"./modes/ofb":215,"./streamCipher":218,"buffer":196,"cipher-base":217,"evp_bytestokey":229,"inherits":387}],207:[function(require,module,exports){
 (function (Buffer){
 var zeros = new Buffer(16)
 zeros.fill(0)
@@ -66486,7 +67138,7 @@ function xor (a, b) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],206:[function(require,module,exports){
+},{"buffer":196}],208:[function(require,module,exports){
 exports['aes-128-ecb'] = {
   cipher: 'AES',
   key: 128,
@@ -66659,7 +67311,7 @@ exports['aes-256-gcm'] = {
   type: 'auth'
 }
 
-},{}],207:[function(require,module,exports){
+},{}],209:[function(require,module,exports){
 var xor = require('buffer-xor')
 
 exports.encrypt = function (self, block) {
@@ -66678,7 +67330,7 @@ exports.decrypt = function (self, block) {
   return xor(out, pad)
 }
 
-},{"buffer-xor":214}],208:[function(require,module,exports){
+},{"buffer-xor":216}],210:[function(require,module,exports){
 (function (Buffer){
 var xor = require('buffer-xor')
 
@@ -66713,7 +67365,7 @@ function encryptStart (self, data, decrypt) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"buffer-xor":214}],209:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":216}],211:[function(require,module,exports){
 (function (Buffer){
 function encryptByte (self, byteParam, decrypt) {
   var pad
@@ -66751,7 +67403,7 @@ function shiftIn (buffer, value) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],210:[function(require,module,exports){
+},{"buffer":196}],212:[function(require,module,exports){
 (function (Buffer){
 function encryptByte (self, byteParam, decrypt) {
   var pad = self._cipher.encryptBlock(self._prev)
@@ -66770,7 +67422,7 @@ exports.encrypt = function (self, chunk, decrypt) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],211:[function(require,module,exports){
+},{"buffer":196}],213:[function(require,module,exports){
 (function (Buffer){
 var xor = require('buffer-xor')
 
@@ -66805,7 +67457,7 @@ exports.encrypt = function (self, chunk) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"buffer-xor":214}],212:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":216}],214:[function(require,module,exports){
 exports.encrypt = function (self, block) {
   return self._cipher.encryptBlock(block)
 }
@@ -66813,7 +67465,7 @@ exports.decrypt = function (self, block) {
   return self._cipher.decryptBlock(block)
 }
 
-},{}],213:[function(require,module,exports){
+},{}],215:[function(require,module,exports){
 (function (Buffer){
 var xor = require('buffer-xor')
 
@@ -66833,7 +67485,7 @@ exports.encrypt = function (self, chunk) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"buffer-xor":214}],214:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":216}],216:[function(require,module,exports){
 (function (Buffer){
 module.exports = function xor (a, b) {
   var length = Math.min(a.length, b.length)
@@ -66847,7 +67499,7 @@ module.exports = function xor (a, b) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],215:[function(require,module,exports){
+},{"buffer":196}],217:[function(require,module,exports){
 (function (Buffer){
 var Transform = require('stream').Transform
 var inherits = require('inherits')
@@ -66926,7 +67578,7 @@ CipherBase.prototype._toString = function (value, enc, final) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"inherits":385,"stream":403,"string_decoder":404}],216:[function(require,module,exports){
+},{"buffer":196,"inherits":387,"stream":405,"string_decoder":406}],218:[function(require,module,exports){
 (function (Buffer){
 var aes = require('./aes')
 var Transform = require('cipher-base')
@@ -66955,7 +67607,7 @@ StreamCipher.prototype._final = function () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":200,"buffer":194,"cipher-base":215,"inherits":385}],217:[function(require,module,exports){
+},{"./aes":202,"buffer":196,"cipher-base":217,"inherits":387}],219:[function(require,module,exports){
 (function (Buffer){
 var CipherBase = require('cipher-base')
 var des = require('des.js')
@@ -67002,7 +67654,7 @@ DES.prototype._final = function () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"cipher-base":219,"des.js":220,"inherits":385}],218:[function(require,module,exports){
+},{"buffer":196,"cipher-base":221,"des.js":222,"inherits":387}],220:[function(require,module,exports){
 exports['des-ecb'] = {
   key: 8,
   iv: 0
@@ -67028,9 +67680,9 @@ exports['des-ede'] = {
   iv: 0
 }
 
-},{}],219:[function(require,module,exports){
-arguments[4][215][0].apply(exports,arguments)
-},{"buffer":194,"dup":215,"inherits":385,"stream":403,"string_decoder":404}],220:[function(require,module,exports){
+},{}],221:[function(require,module,exports){
+arguments[4][217][0].apply(exports,arguments)
+},{"buffer":196,"dup":217,"inherits":387,"stream":405,"string_decoder":406}],222:[function(require,module,exports){
 'use strict';
 
 exports.utils = require('./des/utils');
@@ -67039,7 +67691,7 @@ exports.DES = require('./des/des');
 exports.CBC = require('./des/cbc');
 exports.EDE = require('./des/ede');
 
-},{"./des/cbc":221,"./des/cipher":222,"./des/des":223,"./des/ede":224,"./des/utils":225}],221:[function(require,module,exports){
+},{"./des/cbc":223,"./des/cipher":224,"./des/des":225,"./des/ede":226,"./des/utils":227}],223:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -67106,7 +67758,7 @@ proto._update = function _update(inp, inOff, out, outOff) {
   }
 };
 
-},{"inherits":385,"minimalistic-assert":226}],222:[function(require,module,exports){
+},{"inherits":387,"minimalistic-assert":228}],224:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -67249,7 +67901,7 @@ Cipher.prototype._finalDecrypt = function _finalDecrypt() {
   return this._unpad(out);
 };
 
-},{"minimalistic-assert":226}],223:[function(require,module,exports){
+},{"minimalistic-assert":228}],225:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -67394,7 +68046,7 @@ DES.prototype._decrypt = function _decrypt(state, lStart, rStart, out, off) {
   utils.rip(l, r, out, off);
 };
 
-},{"../des":220,"inherits":385,"minimalistic-assert":226}],224:[function(require,module,exports){
+},{"../des":222,"inherits":387,"minimalistic-assert":228}],226:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -67451,7 +68103,7 @@ EDE.prototype._update = function _update(inp, inOff, out, outOff) {
 EDE.prototype._pad = DES.prototype._pad;
 EDE.prototype._unpad = DES.prototype._unpad;
 
-},{"../des":220,"inherits":385,"minimalistic-assert":226}],225:[function(require,module,exports){
+},{"../des":222,"inherits":387,"minimalistic-assert":228}],227:[function(require,module,exports){
 'use strict';
 
 exports.readUInt32BE = function readUInt32BE(bytes, off) {
@@ -67709,7 +68361,7 @@ exports.padSplit = function padSplit(num, size, group) {
   return out.join(' ');
 };
 
-},{}],226:[function(require,module,exports){
+},{}],228:[function(require,module,exports){
 module.exports = assert;
 
 function assert(val, msg) {
@@ -67722,7 +68374,7 @@ assert.equal = function assertEqual(l, r, msg) {
     throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
 };
 
-},{}],227:[function(require,module,exports){
+},{}],229:[function(require,module,exports){
 (function (Buffer){
 var md5 = require('create-hash/md5')
 module.exports = EVP_BytesToKey
@@ -67794,7 +68446,7 @@ function EVP_BytesToKey (password, salt, keyLen, ivLen) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"create-hash/md5":318}],228:[function(require,module,exports){
+},{"buffer":196,"create-hash/md5":320}],230:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 exports['RSA-SHA224'] = exports.sha224WithRSAEncryption = {
@@ -67869,7 +68521,7 @@ exports['RSA-MD5'] = exports.md5WithRSAEncryption = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],229:[function(require,module,exports){
+},{"buffer":196}],231:[function(require,module,exports){
 (function (Buffer){
 var _algos = require('./algos')
 var createHash = require('create-hash')
@@ -67976,7 +68628,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./algos":228,"./sign":291,"./verify":292,"buffer":194,"create-hash":316,"inherits":385,"stream":403}],230:[function(require,module,exports){
+},{"./algos":230,"./sign":293,"./verify":294,"buffer":196,"create-hash":318,"inherits":387,"stream":405}],232:[function(require,module,exports){
 'use strict'
 exports['1.3.132.0.10'] = 'secp256k1'
 
@@ -67986,7 +68638,7 @@ exports['1.2.840.10045.3.1.1'] = 'p192'
 
 exports['1.2.840.10045.3.1.7'] = 'p256'
 
-},{}],231:[function(require,module,exports){
+},{}],233:[function(require,module,exports){
 (function (module, exports) {
 
 'use strict';
@@ -70306,7 +70958,7 @@ Mont.prototype.invm = function invm(a) {
 
 })(typeof module === 'undefined' || module, this);
 
-},{}],232:[function(require,module,exports){
+},{}],234:[function(require,module,exports){
 (function (Buffer){
 var bn = require('bn.js');
 var randomBytes = require('randombytes');
@@ -70355,7 +71007,7 @@ function getr(priv) {
   return r;
 }
 }).call(this,require("buffer").Buffer)
-},{"bn.js":231,"buffer":194,"randombytes":383}],233:[function(require,module,exports){
+},{"bn.js":233,"buffer":196,"randombytes":385}],235:[function(require,module,exports){
 'use strict';
 
 var elliptic = exports;
@@ -70370,7 +71022,7 @@ elliptic.curves = require('./elliptic/curves');
 // Protocols
 elliptic.ec = require('./elliptic/ec');
 
-},{"../package.json":253,"./elliptic/curve":236,"./elliptic/curves":239,"./elliptic/ec":240,"./elliptic/hmac-drbg":243,"./elliptic/utils":245,"brorand":246}],234:[function(require,module,exports){
+},{"../package.json":255,"./elliptic/curve":238,"./elliptic/curves":241,"./elliptic/ec":242,"./elliptic/hmac-drbg":245,"./elliptic/utils":247,"brorand":248}],236:[function(require,module,exports){
 'use strict';
 
 var bn = require('bn.js');
@@ -70687,7 +71339,7 @@ BasePoint.prototype.dblp = function dblp(k) {
   return r;
 };
 
-},{"../../elliptic":233,"bn.js":231}],235:[function(require,module,exports){
+},{"../../elliptic":235,"bn.js":233}],237:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -71060,7 +71712,7 @@ Point.prototype.getY = function getY() {
 Point.prototype.toP = Point.prototype.normalize;
 Point.prototype.mixedAdd = Point.prototype.add;
 
-},{"../../elliptic":233,"../curve":236,"bn.js":231,"inherits":385}],236:[function(require,module,exports){
+},{"../../elliptic":235,"../curve":238,"bn.js":233,"inherits":387}],238:[function(require,module,exports){
 'use strict';
 
 var curve = exports;
@@ -71070,7 +71722,7 @@ curve.short = require('./short');
 curve.mont = require('./mont');
 curve.edwards = require('./edwards');
 
-},{"./base":234,"./edwards":235,"./mont":237,"./short":238}],237:[function(require,module,exports){
+},{"./base":236,"./edwards":237,"./mont":239,"./short":240}],239:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -71233,7 +71885,7 @@ Point.prototype.getX = function getX() {
   return this.x.fromRed();
 };
 
-},{"../curve":236,"bn.js":231,"inherits":385}],238:[function(require,module,exports){
+},{"../curve":238,"bn.js":233,"inherits":387}],240:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -72142,7 +72794,7 @@ JPoint.prototype.isInfinity = function isInfinity() {
   return this.z.cmpn(0) === 0;
 };
 
-},{"../../elliptic":233,"../curve":236,"bn.js":231,"inherits":385}],239:[function(require,module,exports){
+},{"../../elliptic":235,"../curve":238,"bn.js":233,"inherits":387}],241:[function(require,module,exports){
 'use strict';
 
 var curves = exports;
@@ -72301,7 +72953,7 @@ defineCurve('secp256k1', {
   ]
 });
 
-},{"../elliptic":233,"./precomputed/secp256k1":244,"hash.js":247}],240:[function(require,module,exports){
+},{"../elliptic":235,"./precomputed/secp256k1":246,"hash.js":249}],242:[function(require,module,exports){
 'use strict';
 
 var bn = require('bn.js');
@@ -72512,7 +73164,7 @@ EC.prototype.getKeyRecoveryParam = function(e, signature, Q, enc) {
   throw new Error('Unable to find valid recovery factor');
 };
 
-},{"../../elliptic":233,"./key":241,"./signature":242,"bn.js":231}],241:[function(require,module,exports){
+},{"../../elliptic":235,"./key":243,"./signature":244,"bn.js":233}],243:[function(require,module,exports){
 'use strict';
 
 var bn = require('bn.js');
@@ -72664,7 +73316,7 @@ KeyPair.prototype.inspect = function inspect() {
          ' pub: ' + (this.pub && this.pub.inspect()) + ' >';
 };
 
-},{"../../elliptic":233,"bn.js":231}],242:[function(require,module,exports){
+},{"../../elliptic":235,"bn.js":233}],244:[function(require,module,exports){
 'use strict';
 
 var bn = require('bn.js');
@@ -72736,7 +73388,7 @@ Signature.prototype.toDER = function toDER(enc) {
   return utils.encode(res, enc);
 };
 
-},{"../../elliptic":233,"bn.js":231}],243:[function(require,module,exports){
+},{"../../elliptic":235,"bn.js":233}],245:[function(require,module,exports){
 'use strict';
 
 var hash = require('hash.js');
@@ -72852,7 +73504,7 @@ HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
   return utils.encode(res, enc);
 };
 
-},{"../elliptic":233,"hash.js":247}],244:[function(require,module,exports){
+},{"../elliptic":235,"hash.js":249}],246:[function(require,module,exports){
 module.exports = {
   doubles: {
     step: 4,
@@ -73634,7 +74286,7 @@ module.exports = {
   }
 };
 
-},{}],245:[function(require,module,exports){
+},{}],247:[function(require,module,exports){
 'use strict';
 
 var utils = exports;
@@ -73786,7 +74438,7 @@ function getJSF(k1, k2) {
 }
 utils.getJSF = getJSF;
 
-},{}],246:[function(require,module,exports){
+},{}],248:[function(require,module,exports){
 var r;
 
 module.exports = function rand(len) {
@@ -73845,7 +74497,7 @@ if (typeof window === 'object') {
   }
 }
 
-},{}],247:[function(require,module,exports){
+},{}],249:[function(require,module,exports){
 var hash = exports;
 
 hash.utils = require('./hash/utils');
@@ -73862,7 +74514,7 @@ hash.sha384 = hash.sha.sha384;
 hash.sha512 = hash.sha.sha512;
 hash.ripemd160 = hash.ripemd.ripemd160;
 
-},{"./hash/common":248,"./hash/hmac":249,"./hash/ripemd":250,"./hash/sha":251,"./hash/utils":252}],248:[function(require,module,exports){
+},{"./hash/common":250,"./hash/hmac":251,"./hash/ripemd":252,"./hash/sha":253,"./hash/utils":254}],250:[function(require,module,exports){
 var hash = require('../hash');
 var utils = hash.utils;
 var assert = utils.assert;
@@ -73955,7 +74607,7 @@ BlockHash.prototype._pad = function pad() {
   return res;
 };
 
-},{"../hash":247}],249:[function(require,module,exports){
+},{"../hash":249}],251:[function(require,module,exports){
 var hmac = exports;
 
 var hash = require('../hash');
@@ -74005,7 +74657,7 @@ Hmac.prototype.digest = function digest(enc) {
   return this.outer.digest(enc);
 };
 
-},{"../hash":247}],250:[function(require,module,exports){
+},{"../hash":249}],252:[function(require,module,exports){
 var hash = require('../hash');
 var utils = hash.utils;
 
@@ -74151,7 +74803,7 @@ var sh = [
   8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
 ];
 
-},{"../hash":247}],251:[function(require,module,exports){
+},{"../hash":249}],253:[function(require,module,exports){
 var hash = require('../hash');
 var utils = hash.utils;
 var assert = utils.assert;
@@ -74717,7 +75369,7 @@ function g1_512_lo(xh, xl) {
   return r;
 }
 
-},{"../hash":247}],252:[function(require,module,exports){
+},{"../hash":249}],254:[function(require,module,exports){
 var utils = exports;
 var inherits = require('inherits');
 
@@ -74976,7 +75628,7 @@ function shr64_lo(ah, al, num) {
 };
 exports.shr64_lo = shr64_lo;
 
-},{"inherits":385}],253:[function(require,module,exports){
+},{"inherits":387}],255:[function(require,module,exports){
 module.exports={
   "name": "elliptic",
   "version": "3.1.0",
@@ -75042,7 +75694,7 @@ module.exports={
   "readme": "ERROR: No README data found!"
 }
 
-},{}],254:[function(require,module,exports){
+},{}],256:[function(require,module,exports){
 module.exports={"2.16.840.1.101.3.4.1.1": "aes-128-ecb",
 "2.16.840.1.101.3.4.1.2": "aes-128-cbc",
 "2.16.840.1.101.3.4.1.3": "aes-128-ofb",
@@ -75056,7 +75708,7 @@ module.exports={"2.16.840.1.101.3.4.1.1": "aes-128-ecb",
 "2.16.840.1.101.3.4.1.43": "aes-256-ofb",
 "2.16.840.1.101.3.4.1.44": "aes-256-cfb"
 }
-},{}],255:[function(require,module,exports){
+},{}],257:[function(require,module,exports){
 // from https://github.com/indutny/self-signed/blob/gh-pages/lib/asn1.js
 // Fedor, you are amazing.
 
@@ -75175,7 +75827,7 @@ exports.signature = asn1.define('signature', function () {
   )
 })
 
-},{"asn1.js":258}],256:[function(require,module,exports){
+},{"asn1.js":260}],258:[function(require,module,exports){
 (function (Buffer){
 // adapted from https://github.com/apatil/pemstrip
 var findProc = /Proc-Type: 4,ENCRYPTED\r?\nDEK-Info: AES-((?:128)|(?:192)|(?:256))-CBC,([0-9A-H]+)\r?\n\r?\n([0-9A-z\n\r\+\/\=]+)\r?\n/m
@@ -75209,7 +75861,7 @@ module.exports = function (okey, password) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"browserify-aes":275,"buffer":194,"evp_bytestokey":290}],257:[function(require,module,exports){
+},{"browserify-aes":277,"buffer":196,"evp_bytestokey":292}],259:[function(require,module,exports){
 (function (Buffer){
 var asn1 = require('./asn1')
 var aesid = require('./aesid.json')
@@ -75314,7 +75966,7 @@ function decrypt (data, password) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./aesid.json":254,"./asn1":255,"./fixProc":256,"browserify-aes":275,"buffer":194,"pbkdf2":337}],258:[function(require,module,exports){
+},{"./aesid.json":256,"./asn1":257,"./fixProc":258,"browserify-aes":277,"buffer":196,"pbkdf2":339}],260:[function(require,module,exports){
 var asn1 = exports;
 
 asn1.bignum = require('bn.js');
@@ -75325,7 +75977,7 @@ asn1.constants = require('./asn1/constants');
 asn1.decoders = require('./asn1/decoders');
 asn1.encoders = require('./asn1/encoders');
 
-},{"./asn1/api":259,"./asn1/base":261,"./asn1/constants":265,"./asn1/decoders":267,"./asn1/encoders":270,"bn.js":231}],259:[function(require,module,exports){
+},{"./asn1/api":261,"./asn1/base":263,"./asn1/constants":267,"./asn1/decoders":269,"./asn1/encoders":272,"bn.js":233}],261:[function(require,module,exports){
 var asn1 = require('../asn1');
 var inherits = require('inherits');
 
@@ -75386,7 +76038,7 @@ Entity.prototype.encode = function encode(data, enc, /* internal */ reporter) {
   return this._getEncoder(enc).encode(data, reporter);
 };
 
-},{"../asn1":258,"inherits":385,"vm":407}],260:[function(require,module,exports){
+},{"../asn1":260,"inherits":387,"vm":409}],262:[function(require,module,exports){
 var inherits = require('inherits');
 var Reporter = require('../base').Reporter;
 var Buffer = require('buffer').Buffer;
@@ -75504,7 +76156,7 @@ EncoderBuffer.prototype.join = function join(out, offset) {
   return out;
 };
 
-},{"../base":261,"buffer":194,"inherits":385}],261:[function(require,module,exports){
+},{"../base":263,"buffer":196,"inherits":387}],263:[function(require,module,exports){
 var base = exports;
 
 base.Reporter = require('./reporter').Reporter;
@@ -75512,7 +76164,7 @@ base.DecoderBuffer = require('./buffer').DecoderBuffer;
 base.EncoderBuffer = require('./buffer').EncoderBuffer;
 base.Node = require('./node');
 
-},{"./buffer":260,"./node":262,"./reporter":263}],262:[function(require,module,exports){
+},{"./buffer":262,"./node":264,"./reporter":265}],264:[function(require,module,exports){
 var Reporter = require('../base').Reporter;
 var EncoderBuffer = require('../base').EncoderBuffer;
 var assert = require('minimalistic-assert');
@@ -76112,7 +76764,7 @@ Node.prototype._encodePrimitive = function encodePrimitive(tag, data) {
     throw new Error('Unsupported tag: ' + tag);
 };
 
-},{"../base":261,"minimalistic-assert":272}],263:[function(require,module,exports){
+},{"../base":263,"minimalistic-assert":274}],265:[function(require,module,exports){
 var inherits = require('inherits');
 
 function Reporter(options) {
@@ -76216,7 +76868,7 @@ ReporterError.prototype.rethrow = function rethrow(msg) {
   return this;
 };
 
-},{"inherits":385}],264:[function(require,module,exports){
+},{"inherits":387}],266:[function(require,module,exports){
 var constants = require('../constants');
 
 exports.tagClass = {
@@ -76260,7 +76912,7 @@ exports.tag = {
 };
 exports.tagByName = constants._reverse(exports.tag);
 
-},{"../constants":265}],265:[function(require,module,exports){
+},{"../constants":267}],267:[function(require,module,exports){
 var constants = exports;
 
 // Helper
@@ -76281,7 +76933,7 @@ constants._reverse = function reverse(map) {
 
 constants.der = require('./der');
 
-},{"./der":264}],266:[function(require,module,exports){
+},{"./der":266}],268:[function(require,module,exports){
 var inherits = require('inherits');
 
 var asn1 = require('../../asn1');
@@ -76574,13 +77226,13 @@ function derDecodeLen(buf, primitive, fail) {
   return len;
 }
 
-},{"../../asn1":258,"inherits":385}],267:[function(require,module,exports){
+},{"../../asn1":260,"inherits":387}],269:[function(require,module,exports){
 var decoders = exports;
 
 decoders.der = require('./der');
 decoders.pem = require('./pem');
 
-},{"./der":266,"./pem":268}],268:[function(require,module,exports){
+},{"./der":268,"./pem":270}],270:[function(require,module,exports){
 var inherits = require('inherits');
 var Buffer = require('buffer').Buffer;
 
@@ -76632,7 +77284,7 @@ PEMDecoder.prototype.decode = function decode(data, options) {
   return DERDecoder.prototype.decode.call(this, input, options);
 };
 
-},{"../../asn1":258,"./der":266,"buffer":194,"inherits":385}],269:[function(require,module,exports){
+},{"../../asn1":260,"./der":268,"buffer":196,"inherits":387}],271:[function(require,module,exports){
 var inherits = require('inherits');
 var Buffer = require('buffer').Buffer;
 
@@ -76906,13 +77558,13 @@ function encodeTag(tag, primitive, cls, reporter) {
   return res;
 }
 
-},{"../../asn1":258,"buffer":194,"inherits":385}],270:[function(require,module,exports){
+},{"../../asn1":260,"buffer":196,"inherits":387}],272:[function(require,module,exports){
 var encoders = exports;
 
 encoders.der = require('./der');
 encoders.pem = require('./pem');
 
-},{"./der":269,"./pem":271}],271:[function(require,module,exports){
+},{"./der":271,"./pem":273}],273:[function(require,module,exports){
 var inherits = require('inherits');
 var Buffer = require('buffer').Buffer;
 
@@ -76937,45 +77589,45 @@ PEMEncoder.prototype.encode = function encode(data, options) {
   return out.join('\n');
 };
 
-},{"../../asn1":258,"./der":269,"buffer":194,"inherits":385}],272:[function(require,module,exports){
-arguments[4][226][0].apply(exports,arguments)
-},{"dup":226}],273:[function(require,module,exports){
-arguments[4][200][0].apply(exports,arguments)
-},{"buffer":194,"dup":200}],274:[function(require,module,exports){
-arguments[4][201][0].apply(exports,arguments)
-},{"./aes":273,"./ghash":278,"buffer":194,"buffer-xor":287,"cipher-base":288,"dup":201,"inherits":385}],275:[function(require,module,exports){
+},{"../../asn1":260,"./der":271,"buffer":196,"inherits":387}],274:[function(require,module,exports){
+arguments[4][228][0].apply(exports,arguments)
+},{"dup":228}],275:[function(require,module,exports){
 arguments[4][202][0].apply(exports,arguments)
-},{"./decrypter":276,"./encrypter":277,"./modes":279,"dup":202}],276:[function(require,module,exports){
+},{"buffer":196,"dup":202}],276:[function(require,module,exports){
 arguments[4][203][0].apply(exports,arguments)
-},{"./aes":273,"./authCipher":274,"./modes":279,"./modes/cbc":280,"./modes/cfb":281,"./modes/cfb1":282,"./modes/cfb8":283,"./modes/ctr":284,"./modes/ecb":285,"./modes/ofb":286,"./streamCipher":289,"buffer":194,"cipher-base":288,"dup":203,"evp_bytestokey":290,"inherits":385}],277:[function(require,module,exports){
+},{"./aes":275,"./ghash":280,"buffer":196,"buffer-xor":289,"cipher-base":290,"dup":203,"inherits":387}],277:[function(require,module,exports){
 arguments[4][204][0].apply(exports,arguments)
-},{"./aes":273,"./authCipher":274,"./modes":279,"./modes/cbc":280,"./modes/cfb":281,"./modes/cfb1":282,"./modes/cfb8":283,"./modes/ctr":284,"./modes/ecb":285,"./modes/ofb":286,"./streamCipher":289,"buffer":194,"cipher-base":288,"dup":204,"evp_bytestokey":290,"inherits":385}],278:[function(require,module,exports){
+},{"./decrypter":278,"./encrypter":279,"./modes":281,"dup":204}],278:[function(require,module,exports){
 arguments[4][205][0].apply(exports,arguments)
-},{"buffer":194,"dup":205}],279:[function(require,module,exports){
+},{"./aes":275,"./authCipher":276,"./modes":281,"./modes/cbc":282,"./modes/cfb":283,"./modes/cfb1":284,"./modes/cfb8":285,"./modes/ctr":286,"./modes/ecb":287,"./modes/ofb":288,"./streamCipher":291,"buffer":196,"cipher-base":290,"dup":205,"evp_bytestokey":292,"inherits":387}],279:[function(require,module,exports){
 arguments[4][206][0].apply(exports,arguments)
-},{"dup":206}],280:[function(require,module,exports){
+},{"./aes":275,"./authCipher":276,"./modes":281,"./modes/cbc":282,"./modes/cfb":283,"./modes/cfb1":284,"./modes/cfb8":285,"./modes/ctr":286,"./modes/ecb":287,"./modes/ofb":288,"./streamCipher":291,"buffer":196,"cipher-base":290,"dup":206,"evp_bytestokey":292,"inherits":387}],280:[function(require,module,exports){
 arguments[4][207][0].apply(exports,arguments)
-},{"buffer-xor":287,"dup":207}],281:[function(require,module,exports){
+},{"buffer":196,"dup":207}],281:[function(require,module,exports){
 arguments[4][208][0].apply(exports,arguments)
-},{"buffer":194,"buffer-xor":287,"dup":208}],282:[function(require,module,exports){
+},{"dup":208}],282:[function(require,module,exports){
 arguments[4][209][0].apply(exports,arguments)
-},{"buffer":194,"dup":209}],283:[function(require,module,exports){
+},{"buffer-xor":289,"dup":209}],283:[function(require,module,exports){
 arguments[4][210][0].apply(exports,arguments)
-},{"buffer":194,"dup":210}],284:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":289,"dup":210}],284:[function(require,module,exports){
 arguments[4][211][0].apply(exports,arguments)
-},{"buffer":194,"buffer-xor":287,"dup":211}],285:[function(require,module,exports){
+},{"buffer":196,"dup":211}],285:[function(require,module,exports){
 arguments[4][212][0].apply(exports,arguments)
-},{"dup":212}],286:[function(require,module,exports){
+},{"buffer":196,"dup":212}],286:[function(require,module,exports){
 arguments[4][213][0].apply(exports,arguments)
-},{"buffer":194,"buffer-xor":287,"dup":213}],287:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":289,"dup":213}],287:[function(require,module,exports){
 arguments[4][214][0].apply(exports,arguments)
-},{"buffer":194,"dup":214}],288:[function(require,module,exports){
+},{"dup":214}],288:[function(require,module,exports){
 arguments[4][215][0].apply(exports,arguments)
-},{"buffer":194,"dup":215,"inherits":385,"stream":403,"string_decoder":404}],289:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":289,"dup":215}],289:[function(require,module,exports){
 arguments[4][216][0].apply(exports,arguments)
-},{"./aes":273,"buffer":194,"cipher-base":288,"dup":216,"inherits":385}],290:[function(require,module,exports){
-arguments[4][227][0].apply(exports,arguments)
-},{"buffer":194,"create-hash/md5":318,"dup":227}],291:[function(require,module,exports){
+},{"buffer":196,"dup":216}],290:[function(require,module,exports){
+arguments[4][217][0].apply(exports,arguments)
+},{"buffer":196,"dup":217,"inherits":387,"stream":405,"string_decoder":406}],291:[function(require,module,exports){
+arguments[4][218][0].apply(exports,arguments)
+},{"./aes":275,"buffer":196,"cipher-base":290,"dup":218,"inherits":387}],292:[function(require,module,exports){
+arguments[4][229][0].apply(exports,arguments)
+},{"buffer":196,"create-hash/md5":320,"dup":229}],293:[function(require,module,exports){
 (function (Buffer){
 // much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
 var createHmac = require('create-hmac')
@@ -77164,7 +77816,7 @@ module.exports.getKey = getKey
 module.exports.makeKey = makeKey
 
 }).call(this,require("buffer").Buffer)
-},{"./curves":230,"bn.js":231,"browserify-rsa":232,"buffer":194,"create-hmac":329,"elliptic":233,"parse-asn1":257}],292:[function(require,module,exports){
+},{"./curves":232,"bn.js":233,"browserify-rsa":234,"buffer":196,"create-hmac":331,"elliptic":235,"parse-asn1":259}],294:[function(require,module,exports){
 (function (Buffer){
 // much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
 var curves = require('./curves')
@@ -77271,7 +77923,7 @@ function checkValue (b, q) {
 module.exports = verify
 
 }).call(this,require("buffer").Buffer)
-},{"./curves":230,"bn.js":231,"buffer":194,"elliptic":233,"parse-asn1":257}],293:[function(require,module,exports){
+},{"./curves":232,"bn.js":233,"buffer":196,"elliptic":235,"parse-asn1":259}],295:[function(require,module,exports){
 (function (Buffer){
 var elliptic = require('elliptic');
 var BN = require('bn.js');
@@ -77387,51 +78039,51 @@ function formatReturnValue(bn, enc, len) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"bn.js":294,"buffer":194,"elliptic":295}],294:[function(require,module,exports){
-arguments[4][231][0].apply(exports,arguments)
-},{"dup":231}],295:[function(require,module,exports){
+},{"bn.js":296,"buffer":196,"elliptic":297}],296:[function(require,module,exports){
 arguments[4][233][0].apply(exports,arguments)
-},{"../package.json":315,"./elliptic/curve":298,"./elliptic/curves":301,"./elliptic/ec":302,"./elliptic/hmac-drbg":305,"./elliptic/utils":307,"brorand":308,"dup":233}],296:[function(require,module,exports){
-arguments[4][234][0].apply(exports,arguments)
-},{"../../elliptic":295,"bn.js":294,"dup":234}],297:[function(require,module,exports){
+},{"dup":233}],297:[function(require,module,exports){
 arguments[4][235][0].apply(exports,arguments)
-},{"../../elliptic":295,"../curve":298,"bn.js":294,"dup":235,"inherits":385}],298:[function(require,module,exports){
+},{"../package.json":317,"./elliptic/curve":300,"./elliptic/curves":303,"./elliptic/ec":304,"./elliptic/hmac-drbg":307,"./elliptic/utils":309,"brorand":310,"dup":235}],298:[function(require,module,exports){
 arguments[4][236][0].apply(exports,arguments)
-},{"./base":296,"./edwards":297,"./mont":299,"./short":300,"dup":236}],299:[function(require,module,exports){
+},{"../../elliptic":297,"bn.js":296,"dup":236}],299:[function(require,module,exports){
 arguments[4][237][0].apply(exports,arguments)
-},{"../curve":298,"bn.js":294,"dup":237,"inherits":385}],300:[function(require,module,exports){
+},{"../../elliptic":297,"../curve":300,"bn.js":296,"dup":237,"inherits":387}],300:[function(require,module,exports){
 arguments[4][238][0].apply(exports,arguments)
-},{"../../elliptic":295,"../curve":298,"bn.js":294,"dup":238,"inherits":385}],301:[function(require,module,exports){
+},{"./base":298,"./edwards":299,"./mont":301,"./short":302,"dup":238}],301:[function(require,module,exports){
 arguments[4][239][0].apply(exports,arguments)
-},{"../elliptic":295,"./precomputed/secp256k1":306,"dup":239,"hash.js":309}],302:[function(require,module,exports){
+},{"../curve":300,"bn.js":296,"dup":239,"inherits":387}],302:[function(require,module,exports){
 arguments[4][240][0].apply(exports,arguments)
-},{"../../elliptic":295,"./key":303,"./signature":304,"bn.js":294,"dup":240}],303:[function(require,module,exports){
+},{"../../elliptic":297,"../curve":300,"bn.js":296,"dup":240,"inherits":387}],303:[function(require,module,exports){
 arguments[4][241][0].apply(exports,arguments)
-},{"../../elliptic":295,"bn.js":294,"dup":241}],304:[function(require,module,exports){
+},{"../elliptic":297,"./precomputed/secp256k1":308,"dup":241,"hash.js":311}],304:[function(require,module,exports){
 arguments[4][242][0].apply(exports,arguments)
-},{"../../elliptic":295,"bn.js":294,"dup":242}],305:[function(require,module,exports){
+},{"../../elliptic":297,"./key":305,"./signature":306,"bn.js":296,"dup":242}],305:[function(require,module,exports){
 arguments[4][243][0].apply(exports,arguments)
-},{"../elliptic":295,"dup":243,"hash.js":309}],306:[function(require,module,exports){
+},{"../../elliptic":297,"bn.js":296,"dup":243}],306:[function(require,module,exports){
 arguments[4][244][0].apply(exports,arguments)
-},{"dup":244}],307:[function(require,module,exports){
+},{"../../elliptic":297,"bn.js":296,"dup":244}],307:[function(require,module,exports){
 arguments[4][245][0].apply(exports,arguments)
-},{"dup":245}],308:[function(require,module,exports){
+},{"../elliptic":297,"dup":245,"hash.js":311}],308:[function(require,module,exports){
 arguments[4][246][0].apply(exports,arguments)
 },{"dup":246}],309:[function(require,module,exports){
 arguments[4][247][0].apply(exports,arguments)
-},{"./hash/common":310,"./hash/hmac":311,"./hash/ripemd":312,"./hash/sha":313,"./hash/utils":314,"dup":247}],310:[function(require,module,exports){
+},{"dup":247}],310:[function(require,module,exports){
 arguments[4][248][0].apply(exports,arguments)
-},{"../hash":309,"dup":248}],311:[function(require,module,exports){
+},{"dup":248}],311:[function(require,module,exports){
 arguments[4][249][0].apply(exports,arguments)
-},{"../hash":309,"dup":249}],312:[function(require,module,exports){
+},{"./hash/common":312,"./hash/hmac":313,"./hash/ripemd":314,"./hash/sha":315,"./hash/utils":316,"dup":249}],312:[function(require,module,exports){
 arguments[4][250][0].apply(exports,arguments)
-},{"../hash":309,"dup":250}],313:[function(require,module,exports){
+},{"../hash":311,"dup":250}],313:[function(require,module,exports){
 arguments[4][251][0].apply(exports,arguments)
-},{"../hash":309,"dup":251}],314:[function(require,module,exports){
+},{"../hash":311,"dup":251}],314:[function(require,module,exports){
 arguments[4][252][0].apply(exports,arguments)
-},{"dup":252,"inherits":385}],315:[function(require,module,exports){
+},{"../hash":311,"dup":252}],315:[function(require,module,exports){
 arguments[4][253][0].apply(exports,arguments)
-},{"dup":253}],316:[function(require,module,exports){
+},{"../hash":311,"dup":253}],316:[function(require,module,exports){
+arguments[4][254][0].apply(exports,arguments)
+},{"dup":254,"inherits":387}],317:[function(require,module,exports){
+arguments[4][255][0].apply(exports,arguments)
+},{"dup":255}],318:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 var inherits = require('inherits')
@@ -77487,7 +78139,7 @@ module.exports = function createHash (alg) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./md5":318,"buffer":194,"cipher-base":319,"inherits":385,"ripemd160":320,"sha.js":322}],317:[function(require,module,exports){
+},{"./md5":320,"buffer":196,"cipher-base":321,"inherits":387,"ripemd160":322,"sha.js":324}],319:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 var intSize = 4;
@@ -77524,7 +78176,7 @@ function hash(buf, fn, hashSize, bigEndian) {
 }
 exports.hash = hash;
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],318:[function(require,module,exports){
+},{"buffer":196}],320:[function(require,module,exports){
 'use strict';
 /*
  * A JavaScript implementation of the RSA Data Security, Inc. MD5 Message
@@ -77681,9 +78333,9 @@ function bit_rol(num, cnt)
 module.exports = function md5(buf) {
   return helpers.hash(buf, core_md5, 16);
 };
-},{"./helpers":317}],319:[function(require,module,exports){
-arguments[4][215][0].apply(exports,arguments)
-},{"buffer":194,"dup":215,"inherits":385,"stream":403,"string_decoder":404}],320:[function(require,module,exports){
+},{"./helpers":319}],321:[function(require,module,exports){
+arguments[4][217][0].apply(exports,arguments)
+},{"buffer":196,"dup":217,"inherits":387,"stream":405,"string_decoder":406}],322:[function(require,module,exports){
 (function (Buffer){
 /*
 CryptoJS v3.1.2
@@ -77897,7 +78549,7 @@ function ripemd160 (message) {
 module.exports = ripemd160
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],321:[function(require,module,exports){
+},{"buffer":196}],323:[function(require,module,exports){
 (function (Buffer){
 // prototype class for hash functions
 function Hash (blockSize, finalSize) {
@@ -77970,7 +78622,7 @@ Hash.prototype._update = function () {
 module.exports = Hash
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194}],322:[function(require,module,exports){
+},{"buffer":196}],324:[function(require,module,exports){
 var exports = module.exports = function SHA (algorithm) {
   algorithm = algorithm.toLowerCase()
 
@@ -77987,7 +78639,7 @@ exports.sha256 = require('./sha256')
 exports.sha384 = require('./sha384')
 exports.sha512 = require('./sha512')
 
-},{"./sha":323,"./sha1":324,"./sha224":325,"./sha256":326,"./sha384":327,"./sha512":328}],323:[function(require,module,exports){
+},{"./sha":325,"./sha1":326,"./sha224":327,"./sha256":328,"./sha384":329,"./sha512":330}],325:[function(require,module,exports){
 (function (Buffer){
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-0, as defined
@@ -78091,7 +78743,7 @@ module.exports = Sha
 
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":321,"buffer":194,"inherits":385}],324:[function(require,module,exports){
+},{"./hash":323,"buffer":196,"inherits":387}],326:[function(require,module,exports){
 (function (Buffer){
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-1, as defined
@@ -78191,7 +78843,7 @@ Sha1.prototype._hash = function () {
 module.exports = Sha1
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":321,"buffer":194,"inherits":385}],325:[function(require,module,exports){
+},{"./hash":323,"buffer":196,"inherits":387}],327:[function(require,module,exports){
 (function (Buffer){
 /**
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined
@@ -78247,7 +78899,7 @@ Sha224.prototype._hash = function () {
 module.exports = Sha224
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":321,"./sha256":326,"buffer":194,"inherits":385}],326:[function(require,module,exports){
+},{"./hash":323,"./sha256":328,"buffer":196,"inherits":387}],328:[function(require,module,exports){
 (function (Buffer){
 /**
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined
@@ -78392,7 +79044,7 @@ Sha256.prototype._hash = function () {
 module.exports = Sha256
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":321,"buffer":194,"inherits":385}],327:[function(require,module,exports){
+},{"./hash":323,"buffer":196,"inherits":387}],329:[function(require,module,exports){
 (function (Buffer){
 var inherits = require('inherits')
 var SHA512 = require('./sha512')
@@ -78452,7 +79104,7 @@ Sha384.prototype._hash = function () {
 module.exports = Sha384
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":321,"./sha512":328,"buffer":194,"inherits":385}],328:[function(require,module,exports){
+},{"./hash":323,"./sha512":330,"buffer":196,"inherits":387}],330:[function(require,module,exports){
 (function (Buffer){
 var inherits = require('inherits')
 var Hash = require('./hash')
@@ -78722,7 +79374,7 @@ Sha512.prototype._hash = function () {
 module.exports = Sha512
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":321,"buffer":194,"inherits":385}],329:[function(require,module,exports){
+},{"./hash":323,"buffer":196,"inherits":387}],331:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 var createHash = require('create-hash/browser');
@@ -78794,7 +79446,7 @@ module.exports = function createHmac(alg, key) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"create-hash/browser":316,"inherits":385,"stream":403}],330:[function(require,module,exports){
+},{"buffer":196,"create-hash/browser":318,"inherits":387,"stream":405}],332:[function(require,module,exports){
 (function (Buffer){
 var generatePrime = require('./lib/generatePrime');
 var primes = require('./lib/primes');
@@ -78838,7 +79490,7 @@ exports.DiffieHellmanGroup = exports.createDiffieHellmanGroup = exports.getDiffi
 exports.createDiffieHellman = exports.DiffieHellman = createDiffieHellman;
 
 }).call(this,require("buffer").Buffer)
-},{"./lib/dh":331,"./lib/generatePrime":332,"./lib/primes":333,"buffer":194}],331:[function(require,module,exports){
+},{"./lib/dh":333,"./lib/generatePrime":334,"./lib/primes":335,"buffer":196}],333:[function(require,module,exports){
 (function (Buffer){
 var BN = require('bn.js');
 var MillerRabin = require('miller-rabin');
@@ -79008,7 +79660,7 @@ function formatReturnValue(bn, enc) {
   }
 }
 }).call(this,require("buffer").Buffer)
-},{"./generatePrime":332,"bn.js":334,"buffer":194,"miller-rabin":335,"randombytes":383}],332:[function(require,module,exports){
+},{"./generatePrime":334,"bn.js":336,"buffer":196,"miller-rabin":337,"randombytes":385}],334:[function(require,module,exports){
 var randomBytes = require('randombytes');
 module.exports = findPrime;
 findPrime.simpleSieve = simpleSieve;
@@ -79141,7 +79793,7 @@ function findPrime(bits, gen) {
   }
 
 }
-},{"bn.js":334,"miller-rabin":335,"randombytes":383}],333:[function(require,module,exports){
+},{"bn.js":336,"miller-rabin":337,"randombytes":385}],335:[function(require,module,exports){
 module.exports={
     "modp1": {
         "gen": "02",
@@ -79176,9 +79828,9 @@ module.exports={
         "prime": "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed529077096966d670c354e4abc9804f1746c08ca18217c32905e462e36ce3be39e772c180e86039b2783a2ec07a28fb5c55df06f4c52c9de2bcbf6955817183995497cea956ae515d2261898fa051015728e5a8aaac42dad33170d04507a33a85521abdf1cba64ecfb850458dbef0a8aea71575d060c7db3970f85a6e1e4c7abf5ae8cdb0933d71e8c94e04a25619dcee3d2261ad2ee6bf12ffa06d98a0864d87602733ec86a64521f2b18177b200cbbe117577a615d6c770988c0bad946e208e24fa074e5ab3143db5bfce0fd108e4b82d120a92108011a723c12a787e6d788719a10bdba5b2699c327186af4e23c1a946834b6150bda2583e9ca2ad44ce8dbbbc2db04de8ef92e8efc141fbecaa6287c59474e6bc05d99b2964fa090c3a2233ba186515be7ed1f612970cee2d7afb81bdd762170481cd0069127d5b05aa993b4ea988d8fddc186ffb7dc90a6c08f4df435c93402849236c3fab4d27c7026c1d4dcb2602646dec9751e763dba37bdf8ff9406ad9e530ee5db382f413001aeb06a53ed9027d831179727b0865a8918da3edbebcf9b14ed44ce6cbaced4bb1bdb7f1447e6cc254b332051512bd7af426fb8f401378cd2bf5983ca01c64b92ecf032ea15d1721d03f482d7ce6e74fef6d55e702f46980c82b5a84031900b1c9e59e7c97fbec7e8f323a97a7e36cc88be0f1d45b7ff585ac54bd407b22b4154aacc8f6d7ebf48e1d814cc5ed20f8037e0a79715eef29be32806a1d58bb7c5da76f550aa3d8a1fbff0eb19ccb1a313d55cda56c9ec2ef29632387fe8d76e3c0468043e8f663f4860ee12bf2d5b0b7474d6e694f91e6dbe115974a3926f12fee5e438777cb6a932df8cd8bec4d073b931ba3bc832b68d9dd300741fa7bf8afc47ed2576f6936ba424663aab639c5ae4f5683423b4742bf1c978238f16cbe39d652de3fdb8befc848ad922222e04a4037c0713eb57a81a23f0c73473fc646cea306b4bcbc8862f8385ddfa9d4b7fa2c087e879683303ed5bdd3a062b3cf5b3a278a66d2a13f83f44f82ddf310ee074ab6a364597e899a0255dc164f31cc50846851df9ab48195ded7ea1b1d510bd7ee74d73faf36bc31ecfa268359046f4eb879f924009438b481c6cd7889a002ed5ee382bc9190da6fc026e479558e4475677e9aa9e3050e2765694dfc81f56e880b96e7160c980dd98edd3dfffffffffffffffff"
     }
 }
-},{}],334:[function(require,module,exports){
-arguments[4][231][0].apply(exports,arguments)
-},{"dup":231}],335:[function(require,module,exports){
+},{}],336:[function(require,module,exports){
+arguments[4][233][0].apply(exports,arguments)
+},{"dup":233}],337:[function(require,module,exports){
 var bn = require('bn.js');
 var brorand = require('brorand');
 
@@ -79293,9 +79945,9 @@ MillerRabin.prototype.getDivisor = function getDivisor(n, k) {
   return false;
 };
 
-},{"bn.js":334,"brorand":336}],336:[function(require,module,exports){
-arguments[4][246][0].apply(exports,arguments)
-},{"dup":246}],337:[function(require,module,exports){
+},{"bn.js":336,"brorand":338}],338:[function(require,module,exports){
+arguments[4][248][0].apply(exports,arguments)
+},{"dup":248}],339:[function(require,module,exports){
 (function (Buffer){
 var createHmac = require('create-hmac')
 var MAX_ALLOC = Math.pow(2, 30) - 1 // default in iojs
@@ -79379,7 +80031,7 @@ function pbkdf2Sync (password, salt, iterations, keylen, digest) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"create-hmac":329}],338:[function(require,module,exports){
+},{"buffer":196,"create-hmac":331}],340:[function(require,module,exports){
 exports.publicEncrypt = require('./publicEncrypt');
 exports.privateDecrypt = require('./privateDecrypt');
 
@@ -79390,7 +80042,7 @@ exports.privateEncrypt = function privateEncrypt(key, buf) {
 exports.publicDecrypt = function publicDecrypt(key, buf) {
   return exports.privateDecrypt(key, buf, true);
 };
-},{"./privateDecrypt":379,"./publicEncrypt":380}],339:[function(require,module,exports){
+},{"./privateDecrypt":381,"./publicEncrypt":382}],341:[function(require,module,exports){
 (function (Buffer){
 var createHash = require('create-hash');
 module.exports = function (seed, len) {
@@ -79409,85 +80061,85 @@ function i2ops(c) {
   return out;
 }
 }).call(this,require("buffer").Buffer)
-},{"buffer":194,"create-hash":316}],340:[function(require,module,exports){
-arguments[4][231][0].apply(exports,arguments)
-},{"dup":231}],341:[function(require,module,exports){
-arguments[4][232][0].apply(exports,arguments)
-},{"bn.js":340,"buffer":194,"dup":232,"randombytes":383}],342:[function(require,module,exports){
-arguments[4][254][0].apply(exports,arguments)
-},{"dup":254}],343:[function(require,module,exports){
-arguments[4][255][0].apply(exports,arguments)
-},{"asn1.js":346,"dup":255}],344:[function(require,module,exports){
+},{"buffer":196,"create-hash":318}],342:[function(require,module,exports){
+arguments[4][233][0].apply(exports,arguments)
+},{"dup":233}],343:[function(require,module,exports){
+arguments[4][234][0].apply(exports,arguments)
+},{"bn.js":342,"buffer":196,"dup":234,"randombytes":385}],344:[function(require,module,exports){
 arguments[4][256][0].apply(exports,arguments)
-},{"browserify-aes":363,"buffer":194,"dup":256,"evp_bytestokey":378}],345:[function(require,module,exports){
+},{"dup":256}],345:[function(require,module,exports){
 arguments[4][257][0].apply(exports,arguments)
-},{"./aesid.json":342,"./asn1":343,"./fixProc":344,"browserify-aes":363,"buffer":194,"dup":257,"pbkdf2":337}],346:[function(require,module,exports){
+},{"asn1.js":348,"dup":257}],346:[function(require,module,exports){
 arguments[4][258][0].apply(exports,arguments)
-},{"./asn1/api":347,"./asn1/base":349,"./asn1/constants":353,"./asn1/decoders":355,"./asn1/encoders":358,"bn.js":340,"dup":258}],347:[function(require,module,exports){
+},{"browserify-aes":365,"buffer":196,"dup":258,"evp_bytestokey":380}],347:[function(require,module,exports){
 arguments[4][259][0].apply(exports,arguments)
-},{"../asn1":346,"dup":259,"inherits":385,"vm":407}],348:[function(require,module,exports){
+},{"./aesid.json":344,"./asn1":345,"./fixProc":346,"browserify-aes":365,"buffer":196,"dup":259,"pbkdf2":339}],348:[function(require,module,exports){
 arguments[4][260][0].apply(exports,arguments)
-},{"../base":349,"buffer":194,"dup":260,"inherits":385}],349:[function(require,module,exports){
+},{"./asn1/api":349,"./asn1/base":351,"./asn1/constants":355,"./asn1/decoders":357,"./asn1/encoders":360,"bn.js":342,"dup":260}],349:[function(require,module,exports){
 arguments[4][261][0].apply(exports,arguments)
-},{"./buffer":348,"./node":350,"./reporter":351,"dup":261}],350:[function(require,module,exports){
+},{"../asn1":348,"dup":261,"inherits":387,"vm":409}],350:[function(require,module,exports){
 arguments[4][262][0].apply(exports,arguments)
-},{"../base":349,"dup":262,"minimalistic-assert":360}],351:[function(require,module,exports){
+},{"../base":351,"buffer":196,"dup":262,"inherits":387}],351:[function(require,module,exports){
 arguments[4][263][0].apply(exports,arguments)
-},{"dup":263,"inherits":385}],352:[function(require,module,exports){
+},{"./buffer":350,"./node":352,"./reporter":353,"dup":263}],352:[function(require,module,exports){
 arguments[4][264][0].apply(exports,arguments)
-},{"../constants":353,"dup":264}],353:[function(require,module,exports){
+},{"../base":351,"dup":264,"minimalistic-assert":362}],353:[function(require,module,exports){
 arguments[4][265][0].apply(exports,arguments)
-},{"./der":352,"dup":265}],354:[function(require,module,exports){
+},{"dup":265,"inherits":387}],354:[function(require,module,exports){
 arguments[4][266][0].apply(exports,arguments)
-},{"../../asn1":346,"dup":266,"inherits":385}],355:[function(require,module,exports){
+},{"../constants":355,"dup":266}],355:[function(require,module,exports){
 arguments[4][267][0].apply(exports,arguments)
-},{"./der":354,"./pem":356,"dup":267}],356:[function(require,module,exports){
+},{"./der":354,"dup":267}],356:[function(require,module,exports){
 arguments[4][268][0].apply(exports,arguments)
-},{"../../asn1":346,"./der":354,"buffer":194,"dup":268,"inherits":385}],357:[function(require,module,exports){
+},{"../../asn1":348,"dup":268,"inherits":387}],357:[function(require,module,exports){
 arguments[4][269][0].apply(exports,arguments)
-},{"../../asn1":346,"buffer":194,"dup":269,"inherits":385}],358:[function(require,module,exports){
+},{"./der":356,"./pem":358,"dup":269}],358:[function(require,module,exports){
 arguments[4][270][0].apply(exports,arguments)
-},{"./der":357,"./pem":359,"dup":270}],359:[function(require,module,exports){
+},{"../../asn1":348,"./der":356,"buffer":196,"dup":270,"inherits":387}],359:[function(require,module,exports){
 arguments[4][271][0].apply(exports,arguments)
-},{"../../asn1":346,"./der":357,"buffer":194,"dup":271,"inherits":385}],360:[function(require,module,exports){
-arguments[4][226][0].apply(exports,arguments)
-},{"dup":226}],361:[function(require,module,exports){
-arguments[4][200][0].apply(exports,arguments)
-},{"buffer":194,"dup":200}],362:[function(require,module,exports){
-arguments[4][201][0].apply(exports,arguments)
-},{"./aes":361,"./ghash":366,"buffer":194,"buffer-xor":375,"cipher-base":376,"dup":201,"inherits":385}],363:[function(require,module,exports){
+},{"../../asn1":348,"buffer":196,"dup":271,"inherits":387}],360:[function(require,module,exports){
+arguments[4][272][0].apply(exports,arguments)
+},{"./der":359,"./pem":361,"dup":272}],361:[function(require,module,exports){
+arguments[4][273][0].apply(exports,arguments)
+},{"../../asn1":348,"./der":359,"buffer":196,"dup":273,"inherits":387}],362:[function(require,module,exports){
+arguments[4][228][0].apply(exports,arguments)
+},{"dup":228}],363:[function(require,module,exports){
 arguments[4][202][0].apply(exports,arguments)
-},{"./decrypter":364,"./encrypter":365,"./modes":367,"dup":202}],364:[function(require,module,exports){
+},{"buffer":196,"dup":202}],364:[function(require,module,exports){
 arguments[4][203][0].apply(exports,arguments)
-},{"./aes":361,"./authCipher":362,"./modes":367,"./modes/cbc":368,"./modes/cfb":369,"./modes/cfb1":370,"./modes/cfb8":371,"./modes/ctr":372,"./modes/ecb":373,"./modes/ofb":374,"./streamCipher":377,"buffer":194,"cipher-base":376,"dup":203,"evp_bytestokey":378,"inherits":385}],365:[function(require,module,exports){
+},{"./aes":363,"./ghash":368,"buffer":196,"buffer-xor":377,"cipher-base":378,"dup":203,"inherits":387}],365:[function(require,module,exports){
 arguments[4][204][0].apply(exports,arguments)
-},{"./aes":361,"./authCipher":362,"./modes":367,"./modes/cbc":368,"./modes/cfb":369,"./modes/cfb1":370,"./modes/cfb8":371,"./modes/ctr":372,"./modes/ecb":373,"./modes/ofb":374,"./streamCipher":377,"buffer":194,"cipher-base":376,"dup":204,"evp_bytestokey":378,"inherits":385}],366:[function(require,module,exports){
+},{"./decrypter":366,"./encrypter":367,"./modes":369,"dup":204}],366:[function(require,module,exports){
 arguments[4][205][0].apply(exports,arguments)
-},{"buffer":194,"dup":205}],367:[function(require,module,exports){
+},{"./aes":363,"./authCipher":364,"./modes":369,"./modes/cbc":370,"./modes/cfb":371,"./modes/cfb1":372,"./modes/cfb8":373,"./modes/ctr":374,"./modes/ecb":375,"./modes/ofb":376,"./streamCipher":379,"buffer":196,"cipher-base":378,"dup":205,"evp_bytestokey":380,"inherits":387}],367:[function(require,module,exports){
 arguments[4][206][0].apply(exports,arguments)
-},{"dup":206}],368:[function(require,module,exports){
+},{"./aes":363,"./authCipher":364,"./modes":369,"./modes/cbc":370,"./modes/cfb":371,"./modes/cfb1":372,"./modes/cfb8":373,"./modes/ctr":374,"./modes/ecb":375,"./modes/ofb":376,"./streamCipher":379,"buffer":196,"cipher-base":378,"dup":206,"evp_bytestokey":380,"inherits":387}],368:[function(require,module,exports){
 arguments[4][207][0].apply(exports,arguments)
-},{"buffer-xor":375,"dup":207}],369:[function(require,module,exports){
+},{"buffer":196,"dup":207}],369:[function(require,module,exports){
 arguments[4][208][0].apply(exports,arguments)
-},{"buffer":194,"buffer-xor":375,"dup":208}],370:[function(require,module,exports){
+},{"dup":208}],370:[function(require,module,exports){
 arguments[4][209][0].apply(exports,arguments)
-},{"buffer":194,"dup":209}],371:[function(require,module,exports){
+},{"buffer-xor":377,"dup":209}],371:[function(require,module,exports){
 arguments[4][210][0].apply(exports,arguments)
-},{"buffer":194,"dup":210}],372:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":377,"dup":210}],372:[function(require,module,exports){
 arguments[4][211][0].apply(exports,arguments)
-},{"buffer":194,"buffer-xor":375,"dup":211}],373:[function(require,module,exports){
+},{"buffer":196,"dup":211}],373:[function(require,module,exports){
 arguments[4][212][0].apply(exports,arguments)
-},{"dup":212}],374:[function(require,module,exports){
+},{"buffer":196,"dup":212}],374:[function(require,module,exports){
 arguments[4][213][0].apply(exports,arguments)
-},{"buffer":194,"buffer-xor":375,"dup":213}],375:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":377,"dup":213}],375:[function(require,module,exports){
 arguments[4][214][0].apply(exports,arguments)
-},{"buffer":194,"dup":214}],376:[function(require,module,exports){
+},{"dup":214}],376:[function(require,module,exports){
 arguments[4][215][0].apply(exports,arguments)
-},{"buffer":194,"dup":215,"inherits":385,"stream":403,"string_decoder":404}],377:[function(require,module,exports){
+},{"buffer":196,"buffer-xor":377,"dup":215}],377:[function(require,module,exports){
 arguments[4][216][0].apply(exports,arguments)
-},{"./aes":361,"buffer":194,"cipher-base":376,"dup":216,"inherits":385}],378:[function(require,module,exports){
-arguments[4][227][0].apply(exports,arguments)
-},{"buffer":194,"create-hash/md5":318,"dup":227}],379:[function(require,module,exports){
+},{"buffer":196,"dup":216}],378:[function(require,module,exports){
+arguments[4][217][0].apply(exports,arguments)
+},{"buffer":196,"dup":217,"inherits":387,"stream":405,"string_decoder":406}],379:[function(require,module,exports){
+arguments[4][218][0].apply(exports,arguments)
+},{"./aes":363,"buffer":196,"cipher-base":378,"dup":218,"inherits":387}],380:[function(require,module,exports){
+arguments[4][229][0].apply(exports,arguments)
+},{"buffer":196,"create-hash/md5":320,"dup":229}],381:[function(require,module,exports){
 (function (Buffer){
 var parseKeys = require('parse-asn1');
 var mgf = require('./mgf');
@@ -79598,7 +80250,7 @@ function compare(a, b){
   return dif;
 }
 }).call(this,require("buffer").Buffer)
-},{"./mgf":339,"./withPublic":381,"./xor":382,"bn.js":340,"browserify-rsa":341,"buffer":194,"create-hash":316,"parse-asn1":345}],380:[function(require,module,exports){
+},{"./mgf":341,"./withPublic":383,"./xor":384,"bn.js":342,"browserify-rsa":343,"buffer":196,"create-hash":318,"parse-asn1":347}],382:[function(require,module,exports){
 (function (Buffer){
 var parseKeys = require('parse-asn1');
 var randomBytes = require('randombytes');
@@ -79696,7 +80348,7 @@ function nonZero(len, crypto) {
   return out;
 }
 }).call(this,require("buffer").Buffer)
-},{"./mgf":339,"./withPublic":381,"./xor":382,"bn.js":340,"browserify-rsa":341,"buffer":194,"create-hash":316,"parse-asn1":345,"randombytes":383}],381:[function(require,module,exports){
+},{"./mgf":341,"./withPublic":383,"./xor":384,"bn.js":342,"browserify-rsa":343,"buffer":196,"create-hash":318,"parse-asn1":347,"randombytes":385}],383:[function(require,module,exports){
 (function (Buffer){
 var bn = require('bn.js');
 function withPublic(paddedMsg, key) {
@@ -79709,7 +80361,7 @@ function withPublic(paddedMsg, key) {
 
 module.exports = withPublic;
 }).call(this,require("buffer").Buffer)
-},{"bn.js":340,"buffer":194}],382:[function(require,module,exports){
+},{"bn.js":342,"buffer":196}],384:[function(require,module,exports){
 module.exports = function xor(a, b) {
   var len = a.length;
   var i = -1;
@@ -79718,7 +80370,7 @@ module.exports = function xor(a, b) {
   }
   return a
 };
-},{}],383:[function(require,module,exports){
+},{}],385:[function(require,module,exports){
 (function (process,global,Buffer){
 'use strict';
 
@@ -79750,7 +80402,7 @@ function oldBrowser() {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":389,"buffer":194}],384:[function(require,module,exports){
+},{"_process":391,"buffer":196}],386:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -80053,7 +80705,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],385:[function(require,module,exports){
+},{}],387:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -80078,7 +80730,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],386:[function(require,module,exports){
+},{}],388:[function(require,module,exports){
 /**
  * Determine if an object is Buffer
  *
@@ -80097,12 +80749,12 @@ module.exports = function (obj) {
     ))
 }
 
-},{}],387:[function(require,module,exports){
+},{}],389:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],388:[function(require,module,exports){
+},{}],390:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -80330,7 +80982,7 @@ var substr = 'ab'.substr(-1) === 'b'
 ;
 
 }).call(this,require('_process'))
-},{"_process":389}],389:[function(require,module,exports){
+},{"_process":391}],391:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -80423,10 +81075,10 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],390:[function(require,module,exports){
+},{}],392:[function(require,module,exports){
 module.exports = require("./lib/_stream_duplex.js")
 
-},{"./lib/_stream_duplex.js":391}],391:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":393}],393:[function(require,module,exports){
 // a duplex stream is just a stream that is both readable and writable.
 // Since JS doesn't have multiple prototypal inheritance, this class
 // prototypally inherits from Readable, and then parasitically from
@@ -80510,7 +81162,7 @@ function forEach (xs, f) {
   }
 }
 
-},{"./_stream_readable":393,"./_stream_writable":395,"core-util-is":396,"inherits":385,"process-nextick-args":397}],392:[function(require,module,exports){
+},{"./_stream_readable":395,"./_stream_writable":397,"core-util-is":398,"inherits":387,"process-nextick-args":399}],394:[function(require,module,exports){
 // a passthrough stream.
 // basically just the most minimal sort of Transform stream.
 // Every written chunk gets output as-is.
@@ -80539,7 +81191,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":394,"core-util-is":396,"inherits":385}],393:[function(require,module,exports){
+},{"./_stream_transform":396,"core-util-is":398,"inherits":387}],395:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -81502,7 +82154,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":391,"_process":389,"buffer":194,"core-util-is":396,"events":384,"inherits":385,"isarray":387,"process-nextick-args":397,"string_decoder/":404,"util":193}],394:[function(require,module,exports){
+},{"./_stream_duplex":393,"_process":391,"buffer":196,"core-util-is":398,"events":386,"inherits":387,"isarray":389,"process-nextick-args":399,"string_decoder/":406,"util":195}],396:[function(require,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -81701,7 +82353,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":391,"core-util-is":396,"inherits":385}],395:[function(require,module,exports){
+},{"./_stream_duplex":393,"core-util-is":398,"inherits":387}],397:[function(require,module,exports){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, cb), and it'll handle all
 // the drain event emission and buffering.
@@ -82223,7 +82875,7 @@ function endWritable(stream, state, cb) {
   state.ended = true;
 }
 
-},{"./_stream_duplex":391,"buffer":194,"core-util-is":396,"events":384,"inherits":385,"process-nextick-args":397,"util-deprecate":398}],396:[function(require,module,exports){
+},{"./_stream_duplex":393,"buffer":196,"core-util-is":398,"events":386,"inherits":387,"process-nextick-args":399,"util-deprecate":400}],398:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -82333,7 +82985,7 @@ function objectToString(o) {
   return Object.prototype.toString.call(o);
 }
 }).call(this,{"isBuffer":require("/usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"/usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":386}],397:[function(require,module,exports){
+},{"/usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":388}],399:[function(require,module,exports){
 (function (process){
 'use strict';
 module.exports = nextTick;
@@ -82350,7 +83002,7 @@ function nextTick(fn) {
 }
 
 }).call(this,require('_process'))
-},{"_process":389}],398:[function(require,module,exports){
+},{"_process":391}],400:[function(require,module,exports){
 (function (global){
 
 /**
@@ -82416,10 +83068,10 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],399:[function(require,module,exports){
+},{}],401:[function(require,module,exports){
 module.exports = require("./lib/_stream_passthrough.js")
 
-},{"./lib/_stream_passthrough.js":392}],400:[function(require,module,exports){
+},{"./lib/_stream_passthrough.js":394}],402:[function(require,module,exports){
 var Stream = (function (){
   try {
     return require('st' + 'ream'); // hack to fix a circular dependency issue when used with browserify
@@ -82433,13 +83085,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":391,"./lib/_stream_passthrough.js":392,"./lib/_stream_readable.js":393,"./lib/_stream_transform.js":394,"./lib/_stream_writable.js":395}],401:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":393,"./lib/_stream_passthrough.js":394,"./lib/_stream_readable.js":395,"./lib/_stream_transform.js":396,"./lib/_stream_writable.js":397}],403:[function(require,module,exports){
 module.exports = require("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":394}],402:[function(require,module,exports){
+},{"./lib/_stream_transform.js":396}],404:[function(require,module,exports){
 module.exports = require("./lib/_stream_writable.js")
 
-},{"./lib/_stream_writable.js":395}],403:[function(require,module,exports){
+},{"./lib/_stream_writable.js":397}],405:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -82568,7 +83220,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":384,"inherits":385,"readable-stream/duplex.js":390,"readable-stream/passthrough.js":399,"readable-stream/readable.js":400,"readable-stream/transform.js":401,"readable-stream/writable.js":402}],404:[function(require,module,exports){
+},{"events":386,"inherits":387,"readable-stream/duplex.js":392,"readable-stream/passthrough.js":401,"readable-stream/readable.js":402,"readable-stream/transform.js":403,"readable-stream/writable.js":404}],406:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -82791,14 +83443,14 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":194}],405:[function(require,module,exports){
+},{"buffer":196}],407:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],406:[function(require,module,exports){
+},{}],408:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -83388,7 +84040,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":405,"_process":389,"inherits":385}],407:[function(require,module,exports){
+},{"./support/isBuffer":407,"_process":391,"inherits":387}],409:[function(require,module,exports){
 var indexOf = require('indexof');
 
 var Object_keys = function (obj) {
@@ -83528,7 +84180,7 @@ exports.createContext = Script.createContext = function (context) {
     return copy;
 };
 
-},{"indexof":408}],408:[function(require,module,exports){
+},{"indexof":410}],410:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
