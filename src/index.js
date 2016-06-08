@@ -1350,13 +1350,11 @@ var viz = {
 }
 
 // behave both as a browser library and a node module
-// (HT underscore library)
-var root = this;
-if (typeof exports !== 'undefined') {
+if (typeof window === 'object') {
+  global.viz = viz;
+} else {
   if (typeof module !== 'undefined' && module.exports) {
     exports = module.exports = viz;
   }
   exports.viz = viz;
-} else {
-  root.viz = viz;
 }
