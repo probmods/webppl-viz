@@ -4,8 +4,8 @@ Demo: http://probmods.github.io/webppl-viz/
 
 Dependencies:
 
-- webppl version 0.6.2 or higher
-- webppl-editor commit 321b575 or later
+- webppl (0.7.0-a57eea7 or later)
+- webppl-editor (eeb3208 or later)
 
 Usage: include webppl-viz.js and webppl-viz.css in your web page.
 
