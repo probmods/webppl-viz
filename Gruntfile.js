@@ -26,11 +26,10 @@ module.exports = function(grunt) {
       // TODO: after browserifying webppl, move to demo folder
       webppl: {
         'node_modules/webppl': 'browserify'
-      }//,
-      // 'webppl-editor': {
-      //   'node_modules/webppl-editor': ['browserify','css']
-      // }
-
+      },
+      'webppl-editor': {
+        'node_modules/webppl-editor': ['browserify','css']
+      }
     },
     nodeunit: {
       all: ['tests/test-*.js']
