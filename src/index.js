@@ -50,11 +50,11 @@ function samplesToErp(xs) {
     return global.categorical(probabilities, support);
   }
 
-  var ret = new global.ERP({
+  var ret = {
     sample: sampler,
     score: scorer,
     support: function() { return support }
-  })
+  }
   return ret;
 }
 
