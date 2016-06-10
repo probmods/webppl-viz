@@ -865,7 +865,7 @@ function renderSpec(spec, regularVega) {
       ReactDOM.render(r, resultContainer, function() {
         var comp = this;
         var node = this.refs.content;
-        $(node).text('   rendering...');
+        $(node).html('&nbsp;&nbsp;&nbsp&nbsp;rendering...');
 
         vg.parse.spec(vgSpec,
                       function(error, chart) {
