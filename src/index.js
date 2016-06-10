@@ -1349,12 +1349,10 @@ var viz = {
   heatMap: heatMap
 }
 
-// behave both as a browser library and a node module
+if (typeof module !== 'undefined' && module.exports) {
+  exports = module.exports = viz;
+}
+
 if (typeof window === 'object') {
-  global.viz = viz;
-} else {
-  if (typeof module !== 'undefined' && module.exports) {
-    exports = module.exports = viz;
-  }
-  exports.viz = viz;
+  window.viz = viz;
 }
