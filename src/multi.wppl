@@ -238,13 +238,13 @@ var multiviz = function(df) {
 
   }
 
-  Rejection(model, 10);
+  Rejection(model, {samples: 10});
 
 }
 
 var erpToDf = function(erp) {
   return map(function(state) {
-    return _.extend({}, state, {prob: Math.exp(erp.score(null,state))})
+    return _.extend({}, state, {prob: Math.exp(erp.score(state))})
   }, erp.support())
 
 }
