@@ -50,6 +50,6 @@
     "through": "^2.3.8",
     "watchify": "^3.7.0",
     "webppl": "probmods/webppl#a57eea7",
-    "webppl-editor": "probmods/webppl-editor#0b414e4"
+    "webppl-editor": "probmods/webppl-editor#b69f4f4"
   }
 }

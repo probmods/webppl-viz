@@ -151,7 +151,7 @@ viz.heatMap(repeat(2e2, function() { return [gaussian(0,1), beta(0.5,0.5)] })) <
 
  window.onbeforeunload = function() {
      // hack
-     localStorage.setItem('testing', testingComp.state.code)
+     localStorage.setItem('testing', testingComp.getCode())
  }
 
 </script>
