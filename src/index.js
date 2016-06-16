@@ -23,6 +23,11 @@ function isErp(x) {
   return x.support && x.score;
 }
 
+function getScores(erp) {
+  return _.map(erp.support(),
+               function(state){ return scorer(erp, state) });
+}
+
 function scorer(erp, val) {
   // backwards compatible with both webppl 0.7.0+ (foo.score(val))
   // and earlier versions: foo.score(null, val)
@@ -157,7 +162,9 @@ kindPrinter.r = function(types, support, scores) {
     return _.extend({prob: Math.exp(x[1])}, x[0])
   })
 
-  var densityEstimates = kde(values);
+  var probs = _.pluck(data, 'prob');
+
+  var densityEstimates = kde(values, {weights: probs});
 
   var vlSpec = {
     "data": {"values": densityEstimates},
@@ -1212,20 +1219,28 @@ function heatMap(samples) {
 
 // TODO: should you be able to pass this an erp too?
 // TODO: rename as kde
-function density(samples, options) {
+function density(x, options) {
   options = _.defaults(options || {},
-                       {bounds: 'auto'})
+                       {bounds: 'auto'});
+
+  function extractNumber(z) {
+    return _.isNumber(z) ? z : _.values(z)[0];
+  }
+
+  var xIsErp = isErp(x);
+  var support = xIsErp ? _.map(x.support(), extractNumber) : x,
+      weights = xIsErp ? _.map(getScores(x), Math.exp) : false;
 
   var min, max;
   if (options.bounds == 'auto') {
-    min = _.min(samples)
-    max = _.max(samples)
+    min = _.min(support)
+    max = _.max(support)
   } else {
     min = options.bounds[0];
     max = options.bounds[1];
   }
 
-  var densityEstimate = kde(samples, options);
+  var densityEstimate = kde(support, _.extend({weights: weights}, options));
 
   var vlSpec = {
     "data": {values: densityEstimate},

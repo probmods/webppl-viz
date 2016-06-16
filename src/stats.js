@@ -2,12 +2,14 @@ var _ = require('underscore');
 var d3 = require('d3');
 
 // input: a list of samples and, optionally, a kernel function
-// output: a list of estimated densities (range is min to max and number of bins is 100)
-// TODO: make numBins and bandwidth options (with visible vega knobs?)
+// output: a list of estimated densities
 function kde(samps, options) {
   options = _.defaults(options || {},
                        {bounds: 'auto',
-                        kernel: 'epanechnikov'
+                        bandwidth: 'auto',
+                        kernel: 'epanechnikov',
+                        numPoints: 100,
+                        weights: false
                        })
 
   var kernel;
@@ -20,18 +22,35 @@ function kde(samps, options) {
     kernel = options.kernel
   }
 
+  // add weights
+  var isWeighted = _.isArray(options.weights),
+      weights = options.weights;
+
   // get optimal bandwidth
   // HT http://en.wikipedia.org/wiki/Kernel_density_estimation#Practical_estimation_of_the_bandwidth
   // to support ERP as argument, we need to know the number of samples from an ERP
   // (TODO: submit PR for webppl where Histogram.prototype.toERP preserves this info)
-  var n = samps.length;
-  var mean = samps.reduce(function(x,y) { return x + y })/n;
+  var mean = 0, n = samps.length;
+  var sumWeights = 0;
+  if (isWeighted) {
+    for(var i = 0; i < n; i++) {
+      sumWeights += weights[i];
+      mean += weights[i] * samps[i];
+    }
+    mean = mean / sumWeights;
+  } else {
+    mean = samps.reduce(function(x,y) { return x + y })/n;
+  }
 
-  var s = Math.sqrt(samps.reduce(function(acc, x) {
-    return acc + Math.pow(x - mean, 2)
-  }) / (n-1));
-
-  var bandwidth = 1.06 * s * Math.pow(n, -0.2);
+  var bandwidth;
+  if (options.bandwidth == 'auto') {
+    var s = Math.sqrt(samps.reduce(function(acc, x, i) {
+      return acc + (isWeighted ? weights[i] : 1) * Math.pow(x - mean, 2)
+    }, 0) / (isWeighted ? sumWeights : n-1));
+    bandwidth = 1.06 * s * Math.pow(n, -0.2);
+  } else {
+    bandwidth = options.bandwidth;
+  }
 
   var min, max;
   if (options.bounds == 'auto') {
@@ -42,18 +61,22 @@ function kde(samps, options) {
     max = options.bounds[1];
   }
 
-  var numBins = 100;
-  var binWidth = (max - min) / numBins;
+  var numPoints = options.numPoints;
+  var binWidth = (max - min) / numPoints;
 
   var results = [];
 
-  for (var i = 0; i <= numBins; i++) {
+  for (var i = 0; i <= numPoints; i++) {
     var x = min + i * binWidth;
     var kernelSum = 0;
     for (var j = 0, jj = samps.length; j < jj; j++) {
-      kernelSum += kernel((x - samps[j]) / bandwidth);
+      var w = isWeighted ? weights[j] : 1;
+      kernelSum += w * kernel((x - samps[j]) / bandwidth);
     }
-    results.push({item: x, density: kernelSum / (n * bandwidth)});
+    results.push({
+      item: x,
+      density: kernelSum / ((isWeighted ? sumWeights : n) * bandwidth)
+    });
   }
   return results;
 }
