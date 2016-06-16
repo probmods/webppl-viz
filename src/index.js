@@ -6,6 +6,7 @@ global.d3 = d3;
 
 var vl = require('vega-lite');
 var vg = require('vega');
+global.vg = vg;
 
 var React = require('react');
 var ReactDOM = require('react-dom');
@@ -838,20 +839,95 @@ var GraphComponent = React.createClass({
 function renderSpec(spec, regularVega) {
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
   // data can be large)
-  if (!_.has(spec, 'config')) {
-    spec.config = {numberFormat: '.1e'}
-  } else {
-    if (!_.has(spec.config, 'numberFormat')) {
-      spec.config.numberFormat = '.1e';
-    }
-  }
-
-  // TODO:
-  // for each quantitative field that is displayed, pick a better number format
-  // (ideally, do this to the axis labels, not all the data)
 
   var vgSpec = regularVega ? spec : vl.compile(spec).spec;
 
+  var formatterKeys = [',r',
+                       //',g',
+                       ',.1r',',.2r',',.3r',',.4r',',.5r',',.6r',
+                       //',.1g',',.2g',',.3g',',.4g',',.5g',',.6g',
+                       '.1e'];
+  var formatters  = _.object(formatterKeys,
+                             _.map(formatterKeys,
+                                   function(s) { return d3.format(s) }));
+
+  // format axes: try to guess a good number formatter and format
+  // axes so they don't overlap
+  var allData = vgSpec.data;
+  _.each(
+    vgSpec.marks,
+    function(mark) {
+      var scales = mark.scales;
+      _.each(
+        mark.axes,
+        function(axis) {
+          var scale = _.findWhere(scales, {name: axis.scale}),
+              dataSource = scale.domain.data,
+              dataField = scale.domain.field;
+          var values = _.pluck(_.findWhere(allData, {name: dataSource}).values, dataField);
+          // get tick values
+          var sc = d3.scale.linear();
+          sc.domain(values);
+          sc.range([scale.rangeMin, scale.rangeMax]);
+          if (scale.nice) {
+            sc.nice()
+          }
+          var ticks = sc.ticks(axis.ticks);
+
+          // score formatters by the length of the longest string they produce on ticks
+          var scores = _.map(
+            formatterKeys,
+            function(key) {
+              var f = formatters[key];
+              var strings = _.map(ticks, function(tick) { return f(tick) });
+              var stringsAdjusted;
+              // require that formatter produces different strings for different ticks
+              var score;
+              if (_.unique(strings).length < strings.length) {
+                score = 9999999999
+              } else {
+                // don't penalize for commas
+                stringsAdjusted = _.map(strings, function(s) { return s.replace(',','')})
+                var lengths = _.pluck(stringsAdjusted, 'length');
+                score = _.max(lengths)
+              };
+              return {key: key,
+                      score: score + (key == '.1e' ? 1 : 0),
+                      strings: strings,
+                      stringsAdjusted
+                     } // extra penalty for .1e
+            });
+
+          // get best formatter
+          var bestScore = _.min(_.pluck(scores, 'score'));
+          var bestKeys = _.pluck(_.where(scores, {score: bestScore}),'key');
+
+          // break ties: prefer, in this order:
+          // ,r > ,g >  ,.Xr > ,.Xg > ,.1e
+
+          var bestKey = _.find(bestKeys, function(key) { return key == ',r' }) ||
+              _.find(bestKeys, function(key) { return key == ',g' }) ||
+              _.find(bestKeys, function(key) { return key.indexOf('g') > -1 }) ||
+              _.find(bestKeys, function(key) { return key.indexOf('r') > -1 }) ||
+              bestKeys[0];
+
+          axis.format = bestKey;
+
+          if (axis.type == 'x') {
+            axis.properties = {
+              labels: {
+                // TODO: the actual strings that show up in the picture can differ
+                // from what we compute here, so i'm just using a large constant angle
+                // as a temporary hack
+                angle: {"value": bestScore < 4 ? 0 : 30},
+                align: {"value": 'left'}
+              }
+            }
+          }
+        }
+      )
+    }
+  )
 
   var resultContainer;
 
