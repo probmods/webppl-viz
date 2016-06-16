@@ -47,6 +47,7 @@ function kde(samps, options) {
     var s = Math.sqrt(samps.reduce(function(acc, x, i) {
       return acc + (isWeighted ? weights[i] : 1) * Math.pow(x - mean, 2)
     }, 0) / (isWeighted ? sumWeights : n-1));
+    // TODO: silverman's rule can fail
     bandwidth = 1.06 * s * Math.pow(n, -0.2);
   } else {
     bandwidth = options.bandwidth;

@@ -48,6 +48,15 @@
     scratch pad:
     <pre id="testing"><code></code></pre>
 
+    silverman's rule can fail:
+    <pre><code>var model = function() {
+  var m = flip() ? 10 : -10;
+  return gaussian(m,1);
+}
+var dist = Rejection(model, {samples: 200});
+viz.hist(dist)
+viz.density(dist)</code></pre>
+
     primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
 viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))
