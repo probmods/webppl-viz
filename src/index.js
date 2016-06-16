@@ -1304,7 +1304,9 @@ function table(obj, options) {
   }
 
   options = _.defaults(options || {},
-                       {log: false})
+                       {log: false,
+                        top: false
+                       })
 
   var erp;
   if (_.isArray(obj)) {
@@ -1321,6 +1323,10 @@ function table(obj, options) {
   var sortedZipped = _.sortBy(_.zip(support, scores),function(z) {
     return -z[1]
   });
+
+  if (options.top) {
+    sortedZipped = sortedZipped.slice(0, options.top)
+  }
 
   var tableString = '<table class="wviz-table"><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
 

@@ -26,6 +26,7 @@ Function signatures:
 Options:
 
 - `log` (default = false). If true, shows log probabilities.
+- `top` (default = false). If a number n, only shows top n results.
 
 ### Bar chart
 
