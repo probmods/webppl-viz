@@ -862,12 +862,20 @@ function renderSpec(spec, regularVega) {
         mark.axes,
         function(axis) {
           var scale = _.findWhere(scales, {name: axis.scale}),
-              dataSource = scale.domain.data,
-              dataField = scale.domain.field;
-          var values = _.pluck(_.findWhere(allData, {name: dataSource}).values, dataField);
+              scaleDomain = scale.domain;
+
+          var domain;
+          if (_.isArray(scaleDomain)) {
+            domain = scaleDomain;
+          } else {
+            var dataSource = scale.domain.data,
+                dataField = scale.domain.field || 'item';
+            domain = _.pluck(_.findWhere(allData, {name: dataSource}).values, dataField);
+          }
+
           // get tick values
           var sc = d3.scale.linear();
-          sc.domain(values);
+          sc.domain(domain);
           sc.range([scale.rangeMin, scale.rangeMax]);
           if (scale.nice) {
             sc.nice()
