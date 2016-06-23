@@ -87,6 +87,8 @@ var pamObject = function(o,f) {
   return mapObject(f,o)
 }
 
+
+
 // maps vName onto ranges
 var ranges = {
   x: 'width',
@@ -234,7 +236,7 @@ var multiviz = function(df) {
       legends: legends
     }
 
-    return spec;
+    return markMappings;//spec;
 
   }
 
@@ -261,7 +263,7 @@ var post = MH(function() {
 //multiviz()
 
 var df = erpToDf(post);
-
+util.seedRNG(1)
 var vpost = multiviz(df).sample();
 
 JSON.stringify(vpost,null,2);
