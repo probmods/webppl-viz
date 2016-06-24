@@ -143,17 +143,19 @@ function stringifyIfObject(x) {
 
 var kindPrinter = {};
 
-kindPrinter.c = function(types, support, scores) {
+kindPrinter.c = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
   var fieldName = fieldNames[0];
 
   var values = _.pluck(support, fieldName);
   var probs = scores.map(function(score) { return Math.exp(score) });
 
-  barDispatch(values, probs, {xLabel: fieldName, yLabel: 'frequency'})
+  barWrapper(values, probs, _.extend({xLabel: fieldName, yLabel: 'frequency'}, options))
 }
 
-kindPrinter.r = function(types, support, scores) {
+kindPrinter.r = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
   var fieldName = fieldNames[0];
 
@@ -176,11 +178,12 @@ kindPrinter.r = function(types, support, scores) {
     }
   };
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 
 }
 
-kindPrinter.cc = function(types, support, scores) {
+kindPrinter.cc = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
   var field1Name = fieldNames[0];
   var field2Name = fieldNames[1];
@@ -203,10 +206,11 @@ kindPrinter.cc = function(types, support, scores) {
     config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
   }
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 }
 
-kindPrinter.cr = function(types, support, scores) {
+kindPrinter.cr = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var typesExpanded = _.map(types, function(v,k) {
     return {name: k,
             type: v}
@@ -258,11 +262,12 @@ kindPrinter.cr = function(types, support, scores) {
     }
   };
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 
 }
 
-kindPrinter.rr = function(types, support, scores) {
+kindPrinter.rr = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
   var field1Name = fieldNames[0];
   var field2Name = fieldNames[1];
@@ -286,12 +291,14 @@ kindPrinter.rr = function(types, support, scores) {
     config: {numberFormat: ".1e"}
   }
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 }
 
 // TODO: find the field with the smallest number of values and use that for rows
 // TODO: rewrite once vega-lite can support small multiples of heatmaps (https://github.com/vega/vega-lite/issues/699)
-kindPrinter.ccc = function(types, support, scores) {
+// TODO: can't write this to a file yet because we create a bunch of separate graphs rather than a single one
+kindPrinter.ccc = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
   var field1Name = fieldNames[0];
   var field2Name = fieldNames[1];
@@ -327,7 +334,8 @@ kindPrinter.ccc = function(types, support, scores) {
   // todo
 }
 
-kindPrinter.ccr = function(types, support, scores) {
+kindPrinter.ccr = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var typesExpanded = _.map(types, function(v,k) {
     return {name: k,
             type: v}
@@ -335,13 +343,6 @@ kindPrinter.ccr = function(types, support, scores) {
 
   var cDimNames = _(typesExpanded).chain().where({type: 'categorical'}).pluck('name').value();
   var rDimNames = _(typesExpanded).chain().where({type: 'real'}).pluck('name').value();
-
-  // mapping choices: {c0, c1} -> {facet, color}
-  // TODO: write cccr (use facet_row as well)
-
-  // issue with writing a forward model here: this library is javascript
-  // but we want to call webppl (i guess i precompile the inference and stick it in here)
-
   var facetDimName = cDimNames[0];
   var cDimName = cDimNames[1];
   var rDimName = rDimNames[0]
@@ -379,7 +380,7 @@ kindPrinter.ccr = function(types, support, scores) {
       .flatten(1)
       .value();
 
-  var vlSpec1 = {
+  var vlSpec = {
     "data": {"values": densityEstimatesTidied},
     "mark": "line",
     encoding: {
@@ -390,118 +391,12 @@ kindPrinter.ccr = function(types, support, scores) {
     }
   };
 
-  var vlSpec2 = {
-    "data": {"values": densityEstimatesTidied},
-    "mark": "line",
-    encoding: {
-      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}},
-      y: {"type": "quantitative", "field": "density"},
-      color: {"type": "nominal", "field": facetDimName, axis: {title: facetDimName}},
-      column: {type: 'nominal', field: cDimName}
-    }
-  };
-
-  renderSpec(vlSpec1);
-  //renderArray([vlSpec1, vlSpec2])
-
+  renderSpec(vlSpec, options);
 }
 
-// HT http://codereview.stackexchange.com/a/59621
-function perms(data) {
-    data = data.slice();  // make a copy
-    var permutations = [],
-        stack = [];
 
-    function doPerm() {
-        if (data.length == 0) {
-            permutations.push(stack.slice());
-        }
-        for (var i = 0; i < data.length; i++) {
-            var x = data.splice(i, 1);
-            stack.push(x);
-            doPerm();
-            stack.pop();
-            data.splice(i, 0, x);
-        }
-    }
-
-    doPerm();
-    return permutations;
-}
-
-kindPrinter.cccr = function(types, support, scores) {
-  var typesExpanded = _.map(types, function(v,k) {
-    return {name: k,
-            type: v}
-  })
-
-  var cDimNames = _(typesExpanded).chain().where({type: 'categorical'}).pluck('name').value();
-  var rDimNames = _(typesExpanded).chain().where({type: 'real'}).pluck('name').value();
-
-  var rDimName = rDimNames[0];
-
-  // mapping choices: {c0, c1} -> {facet, color}
-  // TODO: write cccr (use facet_row as well)
-
-  // issue with writing a forward model here: this library is javascript
-  // but we want to call webppl (i guess i precompile the inference and stick it in here)
-
-  var data = _.zip(support, scores).map(function(x) {
-    return _.extend({prob: Math.exp(x[1])}, x[0])
-  })
-
-  var categoricalPermutations = perms(cDimNames);
-
-
-  var specs = _.map(
-    categoricalPermutations,
-    function(perm) {
-
-      var dataGroupedByC = _.groupBy(data,
-                                     function(obs) { return JSON.stringify(_.pick(obs, cDimNames)) })
-
-      // for each group, get the density estimate and weight each bin within that estimate
-      // by the total group probability
-      var densityEstimates = _.mapObject(dataGroupedByC,
-                                         function(states, k) {
-
-                                           var groupWeight = util.sum(_.pluck(states,'prob'));
-
-                                           var rValues = _.pluck(states, rDimName);
-                                           var estimates = kde(rValues);
-                                           _.each(estimates, function(est) { est.density *= groupWeight });
-                                           return estimates;
-                                         });
-
-
-      var densityEstimatesTidied = _
-          .chain(densityEstimates)
-          .map(function(vs,k) {
-            var kParsed = JSON.parse(k); _.each(vs, function(v) { _.extend(v, kParsed) });
-            return vs })
-          .flatten(1)
-          .value();
-
-      return {
-        "data": {"values": densityEstimatesTidied},
-        "mark": "line",
-        encoding: {
-          column: {type: 'nominal', field: perm[0]},
-          row: {type: 'nominal', field: perm[1]},
-          color: {"type": "nominal", "field": perm[2], axis: {title: perm[2]}},
-          x: {"type": "quantitative", "field": "item", axis: {title: rDimName}},
-          y: {"type": "quantitative", "field": "density"}
-        }
-      };
-
-
-    })
-
-  renderArray(specs);
-
-}
-
-kindPrinter.crr = function(types, support, scores) {
+kindPrinter.crr = function(args, options) {
+  var scores = args.scores, types = args.types, support = args.support;
   var typesExpanded = _.map(types, function(v,k) {
     return {name: k,
             type: v}
@@ -530,11 +425,17 @@ kindPrinter.crr = function(types, support, scores) {
     config: {numberFormat: ".1e"}
   }
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 }
 
+kindPrinter.cccr = require('./cccr');
+
 // TODO: also expose as viz.parcoords
-function parallelCoordinates(types, support, scores) {
+function parallelCoordinates(args, options) {
+  var types = args.types,
+      support = args.support,
+      scores = args.scores;
+
   var fieldNames = _.keys(support[0]);
 
   var data = _.zip(support, scores).map(function(x) {
@@ -636,11 +537,11 @@ function parallelCoordinates(types, support, scores) {
       }
     ]
   }
-  renderSpec(vegaSpec, "regularVega")
+  renderSpec(vegaSpec, _.extend({regularVega: true}, options));
 }
 
 // automatically render an ERP
-function auto(obj) {
+function auto(obj, options) {
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
     // some questions:
@@ -668,10 +569,12 @@ function auto(obj) {
   if (!isErp(obj)) {
     // TODO: write wpEditor.warn method, use it to inform user that auto only works on ERPs
     // (though maybe this isn't necessary since we are using __print__ decorator in wp-editor?)
-    return null;
+    // maybe warn and fall back to print
+    throw new Error('viz.auto() doesn\'t know how to render ' + obj.toString());
   }
 
   var support = obj.support();
+  // TODO: use switch statement here
   var supportStructure = (isVector(support)
                           ? 'vector'
                           : (isPseudoDataFrame(support)
@@ -719,15 +622,21 @@ function auto(obj) {
 
   // HACK: use parallel coords for rn where n >= 3
   if (dfKind.indexOf('c') == -1 && dfKind.length >= 3) {
-    parallelCoordinates(columnTypesDict, supportStringified, scores);
+    parallelCoordinates({types: columnTypesDict,
+                         support: supportStringified,
+                         scores: scores},
+                        options);
   } else if (_.has(kindPrinter, dfKind)) {
     // NB: passes in supportStringified, not support
-    kindPrinter[dfKind](columnTypesDict, supportStringified, scores);
+    kindPrinter[dfKind]({types: columnTypesDict,
+                         support: supportStringified,
+                         scores: scores},
+                        options)
   } else {
     // TODO: switch to warning rather than error
     // (and maybe use wpEditor.put to store the data)
     console.log(dfKind)
-    throw new Error('viz.print() doesn\'t know how to render objects of kind ' + dfKind);
+    throw new Error('viz.auto() doesn\'t know how to render objects of kind ' + dfKind);
   }
 
 
@@ -762,7 +671,7 @@ var GraphComponent = React.createClass({
                         : this.state.view.toImageURL('svg'));
     var graphName = (graphUrl == null
                      ? null
-                     : md5(graphUrl || "").substring(0,6) + '.svg');
+                     : this.props.fileName || (md5(graphUrl || "").substring(0,6) + '.svg'));
 
     // NB: download doesn't work perfectly in safari (it just spawns the picture in a new tab)
     // but that's how it works for the vega online editor too, so leave it here for now
@@ -836,11 +745,16 @@ var GraphComponent = React.createClass({
 })
 
 // parse a vega-lite or regular vega description and render it
-function renderSpec(spec, regularVega) {
+function renderSpec(spec, _options) {
+  var options = _.defaults(_options || {},
+                           {regularVega: false,
+                            fileName: false
+                           })
+
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
   // data can be large)
 
-  var vgSpec = regularVega ? spec : vl.compile(spec).spec;
+  var vgSpec = options.regularVega ? spec : vl.compile(spec).spec;
 
   var formatterKeys = [',r',
                        //',g',
@@ -943,7 +857,9 @@ function renderSpec(spec, regularVega) {
     if (wpEditor && wpEditor.makeResultContainer) {
       resultContainer = wpEditor.makeResultContainer()
 
-      var r = React.createElement(GraphComponent, {spec: vgSpec});
+      var r = React.createElement(GraphComponent,
+                                  _.extend({spec: vgSpec},
+                                           _.pick(options, 'fileName')));
 
       // different possible architectures:
       // - render before making React component, call update(), and pass result as prop
@@ -975,10 +891,10 @@ function renderSpec(spec, regularVega) {
                   function(error, chart) {
                     var view = chart({renderer: 'svg'}).update();
                     var svgText = view.svg();
-                    var hash = md5(svgText).substring(0,7);
+                    var fileName = options.fileName || (md5(svgText).substring(0,7) + '.svg');
 
-                    require('fs').writeFileSync(hash + '.svg', svgText);
-                    console.log("Rendered to " + hash + ".svg");
+                    require('fs').writeFileSync(fileName, svgText);
+                    console.log("Rendered to " + fileName);
                   });
 
   }
@@ -986,72 +902,14 @@ function renderSpec(spec, regularVega) {
 }
 
 // parse an array of vega-lite or regular vega descriptions and render them
-function renderArray(specs/*: array */, regularVega) {
-  var nSpecsRemaining = specs.length;
-
-  var resultContainer = wpEditor.makeResultContainer();
-
-  // div that holds selected item
-  var $zoomDiv = $("<div>").addClass("zoomDiv");
-
-  _.each(specs,
-         function(spec) {
-
-           var vgSpec = regularVega ? spec : vl.compile(spec).spec;
-           var thumbnailContainer = $('<div>').addClass('thumbnail');
-
-           $(resultContainer).append(thumbnailContainer);
-
-           vg.parse.spec(vgSpec,
-                         function(error, chart) {
-                           // TODO: current thumbnail sizing is hacky, figure out more idiomatic way
-                           var view = chart({el: thumbnailContainer[0], renderer: 'svg'}).update();
-
-                           var $svg = $(view._el).find("svg");
-
-                           var origHeight = $svg.attr("height");
-                           var origWidth = $svg.attr("width");
-                           var origTransform = $svg.children().attr("transform");
-
-                           $svg.attr({height: origHeight * 0.2,
-                                      width: origWidth * 0.2});
-
-
-                           $svg.children().attr("transform","scale(0.2) " + origTransform );
-
-                           $svg.click(function() {
-                             //console.log('todo')
-
-                             var $zoomSvg = $(this)
-                                 .clone()
-                                 .attr({height: origHeight,
-                                        width: origWidth})
-
-                             debugger;
-                             $zoomSvg.children().attr("transform", origTransform);
-
-                             $zoomDiv
-                               .empty()
-                               .append($zoomSvg);
-                           })
-
-                         });
-         }
-        );
-
-  $(resultContainer)
-    .append($("<div>").addClass("clearboth"))
-    .append($zoomDiv);
-
-
-}
 
 // TODO: groupBy defaults to the third key in df
 // TODO: clean up options stuff
-function barDfs(df, options) {
+function bar(df, options) {
   options = _.defaults(options || {},
                        {groupBy: false,
-                        xType: 'nominal'
+                        xType: 'nominal',
+                        fileName: false
                        })
 
   var xName = _.keys(df[0])[0];
@@ -1093,14 +951,14 @@ function barDfs(df, options) {
     vlSpec.config =  {"facet": {"cell": {"strokeWidth": 0}}}
   }
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 }
 
-function barDispatch() {
+function barWrapper() {
   var args = _.toArray(arguments);
 
   if (isDataFrame(arguments[0])) {
-    barDfs.apply(null,args)
+    bar.apply(null,args)
   } else {
     var xs = args[0];
     var ys = args[1];
@@ -1110,7 +968,7 @@ function barDispatch() {
       df.push({x: xs[i], y: ys[i]})
     }
 
-    barDfs.apply(null,[df].concat(args.slice(2)));
+    bar.apply(null,[df].concat(args.slice(2)));
   }
 }
 
@@ -1159,18 +1017,18 @@ function hist(obj, options) {
       return ((bin.upper + bin.lower)/2).toExponential(2)
     })
 
-    barDispatch(binLabels, binProbs, {xLabel: 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
+    barWrapper(binLabels, binProbs, {xLabel: 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
 
     return;
   }
 
   var supportStringified = support.map(stringifyIfObject)
 
-  barDispatch(supportStringified, probs, {xLabel: 'Value', yLabel: 'Probability'})
+  barWrapper(supportStringified, probs, _.extend({xLabel: 'Value', yLabel: 'Probability'}, options))
 
 };
 
-function scatterDfs(df, options) {
+function scatter(df, options) {
 
   options = _.defaults(options || {},
                        {groupBy: false
@@ -1195,14 +1053,14 @@ function scatterDfs(df, options) {
     }
   }
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 }
 
-function scatterDispatch() {
+function scatterWrapper() {
   var args = _.toArray(arguments);
 
   if (isDataFrame(arguments[0])) {
-    scatterDfs.apply(null,args)
+    scatter.apply(null,args)
   } else {
     var xs = args[0];
     var ys = args[1];
@@ -1212,7 +1070,7 @@ function scatterDispatch() {
       df.push({x: xs[i], y: ys[i]})
     }
 
-    scatterDfs.apply(null,[df].concat(args.slice(2)));
+    scatter.apply(null,[df].concat(args.slice(2)));
   }
 }
 
@@ -1298,7 +1156,7 @@ function heatMap(samples) {
     "config": {"numberFormat": ".1e"}
   };
 
-  renderSpec(spec, 'regularVega')
+  renderSpec(spec, {regularVega: true})
 }
 
 // TODO: should you be able to pass this an erp too?
@@ -1340,11 +1198,11 @@ function density(x, options) {
     "config": {"mark": {"interpolate": "monotone"}}
   };
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 }
 
 // TODO: show points too
-function lineDfs(df, options) {
+function line(df, options) {
   options = _.defaults(options || {},
                        {groupBy: false})
 
@@ -1369,14 +1227,14 @@ function lineDfs(df, options) {
     }
   }
 
-  renderSpec(vlSpec);
+  renderSpec(vlSpec, options);
 
 }
 
-function lineDispatch() {
+function lineWrapper() {
   var args = _.toArray(arguments);
   if (isDataFrame(arguments[0])) {
-    return lineDfs.apply(null, arguments);
+    line.apply(null, arguments);
   } else {
     var xs = args[0];
     var ys = args[1];
@@ -1386,7 +1244,7 @@ function lineDispatch() {
         df.push({x: xs[i], y: ys[i]})
     }
 
-    return lineDfs(df);
+    line.apply(null,[df].concat(args.slice(2)));
   }
 }
 
@@ -1445,11 +1303,11 @@ function table(obj, options) {
 var viz = {
   d3auto: require('./old').print,
   auto: auto,
-  bar: barDispatch,
+  bar: barWrapper,
   hist: hist,
-  scatter: scatterDispatch,
+  scatter: scatterWrapper,
   density: density,
-  line: lineDispatch,
+  line: lineWrapper,
   table: table,
   heatMap: heatMap
 }

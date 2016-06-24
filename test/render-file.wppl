@@ -1,0 +1,82 @@
+// from root directory, run:
+// webppl test/render-file.wppl --require .
+
+var viz = webpplViz;
+
+//viz.bar(['a','b','c'], [1,2,3])
+viz.bar(['a','b','c'], [1,2,3], {fileName: 'bar.svg'})
+viz.hist(repeat(4,flip), {fileName: 'hist.svg'})
+viz.scatter([1,2,3],[4,5,6], {fileName: 'scatter.svg'})
+
+
+viz.density(repeat(4, function() { gaussian(0, 1)}), {fileName: 'density.svg'})
+
+
+viz.line([1,2,3],[4,5,6], {fileName: 'line.svg'})
+
+viz.auto(ParticleFilter(function() {
+  return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}
+}, 500),
+         {fileName: 'c.svg'}
+        )
+
+viz.auto(ParticleFilter(function() { return categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}, 500), {fileName: '(c).svg'})
+
+viz.auto(ParticleFilter(function() { return {x: beta(3,2)};},500), {fileName: 'r.svg'})
+
+viz.auto(Enumerate(function() {
+  return {
+    fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"]),
+    boolean: flip(0.7)
+  }}), {fileName: 'cc.svg'})
+
+
+viz.auto(MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi';
+  return {
+    brand: brand,
+    price: gaussian(brand == 'coke' ? 4 : 2, 1)
+  }
+}, 2000), {fileName: 'cr.svg'});
+
+viz.auto(MH(function() {
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+  factor(Math.log(Math.abs(x-y)))
+  return {x: x, y: y};
+},5000), {fileName: 'rr.svg'})
+
+// // TODO
+// viz.auto(Enumerate(function() {
+//   return {
+//     who: categorical([1, 1, 1, 1, 1, 1], ["Plum", "Peacock", "White", "Scarlet", "Mustard", "Green"]),
+//     where: categorical([1, 3, 5, 2, 4], ["candlestick", "knife", "revolver", "rope", "poison"]),
+//     with_what: categorical([1, 1, 1, 1, 1], ["dining", "kitchen", "hall", "conservatory", "library"])
+//   }
+// }), {fileName: 'ccc.svg'})
+
+
+viz.auto(MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi';
+  return {
+    country: uniformDraw(['usa','mexico','canada']),
+    brand: brand,
+    price: gaussian(brand == 'coke' ? 4 : 2, 1)
+  }
+}, 2000), {fileName: 'ccr.svg'});
+
+viz.auto(MH(function() {
+  var brand = flip(0.7) ? 'coke' : 'pepsi'
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+  factor(Math.log(Math.abs(x-y)))
+  return {brand: brand, x: x, y: y};
+},5000), {fileName: 'crr.svg'})
+
+viz.auto(ParticleFilter(function() {
+  var x = uniform(0,1);
+  var y = uniform(0,1);
+  var z = uniform(0,1);
+  factor(Math.log(Math.abs(x-y) + Math.abs(x-z)))
+  return {x: x, y: y, z: z};
+},500), {fileName: 'rrr.svg'})

@@ -85,7 +85,7 @@ viz.auto(MH(function() {
 }, 4000));</code></pre>
   </body>
   <script>
-   $("#r230rj code").text(localStorage.getItem('r230rj'));
+   // $("#r230rj code").text(localStorage.getItem('r230rj'));
 
    var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
    preEls.map(function(el) {
@@ -96,7 +96,7 @@ viz.auto(MH(function() {
 
    window.onbeforeunload = function() {
        // hack
-       localStorage.setItem('r230rj', testingComp.state.code)
+       // localStorage.setItem('r230rj', testingComp.getCode())
    }
 
   </script>
