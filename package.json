@@ -11,7 +11,16 @@
     "url": "https://github.com/probmods/webppl-viz.git"
   },
   "browserify": {
-      "transform": [["babelify", { "presets": ["react"] }]]
+    "transform": [
+      [
+        "babelify",
+        {
+          "presets": [
+            "react"
+          ]
+        }
+      ]
+    ]
   },
   "author": "Long Ouyang",
   "license": "MIT",
@@ -34,6 +43,7 @@
     "vega-lite": "^1.0.8"
   },
   "devDependencies": {
+    "aws-sdk": "^2.4.2",
     "browserify": "^13.0.0",
     "browserify-shim": "^3.8.12",
     "browserify-versionify": "^1.0.6",
