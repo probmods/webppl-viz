@@ -9,6 +9,7 @@ var fs = require('fs');
 var AWS = require('aws-sdk');
 var zlib = require('zlib');
 var execSync = require('child_process').execSync;
+var _ = require('underscore');
 
 function git(cmd) {
   return function(dir) {
@@ -29,33 +30,48 @@ function catchAll(fn) {
 
 var version = catchAll(git('rev-parse --short HEAD'))('.');
 
-var fileName = 'webppl-viz-' + version + '.js';
-
 AWS.config.update({region: 'us-west-2'});
 
-var gzip = zlib.createGzip();
-var params = {
-  ACL: 'public-read',
-  Bucket: 'cdn.webppl.org',
-  Key: fileName,
-  Body: fs.createReadStream('bundle/webppl-viz.js').pipe(gzip),
-  ContentEncoding: 'gzip',
-  ContentType: 'application/javascript'
-};
+
+var getFile = function(name) {
+  return fs.createReadStream(name).pipe(zlib.createGzip());
+}
 
 var s3 = new AWS.S3()
-s3.upload(params)
-  .on('httpUploadProgress', function(evt) {
-    console.log('Uploading: ')
-    console.log(evt);
-    console.log('\n');
-  })
-  .send(function(err, data) {
-    if (err) {
-      console.log('Error uploading')
-      console.log(err);
-    } else {
-      console.log('Success');
-      console.log(data);
-    }
-  });
+var upload = function(params) {
+  params = _.defaults(params,
+                      {ACL: 'public-read',
+                       Bucket: 'cdn.webppl.org',
+                       ContentEncoding: 'gzip'
+                      })
+
+  s3.upload(params)
+    .on('httpUploadProgress', function(evt) {
+      console.log('Uploading: ')
+      console.log(evt);
+      console.log('\n');
+    })
+    .send(function(err, data) {
+      if (err) {
+        console.log('Error uploading:')
+        console.log(err);
+      } else {
+        console.log('Success:');
+        console.log(data);
+      }
+    });
+}
+
+var jsParams = {
+  Key: 'webppl-viz-' + version + '.js',
+  Body: getFile('bundle/webppl-viz.js'),
+  ContentType: 'application/javascript'
+};
+upload(jsParams);
+
+var cssParams = {
+  Key: 'webppl-viz-' + version + '.css',
+  Body: getFile('bundle/webppl-viz.css'),
+  ContentType: 'text/css'
+};
+upload(cssParams);
