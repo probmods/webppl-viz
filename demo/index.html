@@ -166,7 +166,16 @@ viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 100000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 1000000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 10000000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 100000000}; },500))
-</code></pre>
+    </code></pre>
+
+    marginals:
+    <pre><code>
+viz.marginals(MH(function() {
+  return {x1: uniform(0,1),
+          x2: uniformDraw(['fruit', 'vegetable'])
+         }
+}, 100))
+    </code></pre>
 
   </body>
 <script>
