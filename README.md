@@ -12,9 +12,9 @@ Usage:
 - Browser: include webppl-viz.js and webppl-viz.css in your web page.
 - Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages)
 
-## Standard functions
+### Basic functions
 
-### Table
+#### Table
 
 Shows an ERP as a textual table.
 
@@ -28,7 +28,7 @@ Options:
 - `log` (default = false). If true, shows log probabilities.
 - `top` (default = false). If a number n, only shows top n results.
 
-### Bar chart
+#### Bar chart
 
 Function signatures:
 
@@ -43,7 +43,7 @@ Options:
 - `xType` (default: nominal). type of x axis (nominal or quantitative).
 - `groupBy` (default: none). Grouping variable for different bars.
 
-### Histogram
+#### Histogram
 
 Function signatures:
 
@@ -54,7 +54,7 @@ Options:
 
 - `numBins` (defaults to 30). For real-valued data, how many bins to aggregate data into.
 
-### Line chart
+#### Line chart
 
 Function signatures:
 
@@ -67,7 +67,7 @@ Options:
 - `yLabel` (default: y). y axis label.
 - `groupBy` (default: none). Grouping variable for different lines.
 
-### Scatter plot
+#### Scatter plot
 
 Function signatures:
 
@@ -79,7 +79,7 @@ Options:
 - `xLabel` (default: x). x axis label.
 - `yLabel` (default: y). y axis label.
 
-### Density curve
+#### Density curve
 
 Function signatures:
 
@@ -90,46 +90,47 @@ Options:
 
 - `bounds` (default: min and max of the supplied samples). An array of bounds for density estimation
 
-### Heat map
+#### Heat map
 
 - `viz.heatMap(samples, [options])`
 - `viz.heatMap(erp, [options])` (TODO: save total_count in webppl Histogram.toERP)
 
-### Parallel coordinates
+#### Parallel coordinates
 
 TODO: expose this functionality to end users
 
 - `viz.parcoords(erp)`
 
-## Automatic functions
+### Complex functions
 
-### `viz.marginals`
+#### Marginals
 
 `viz.marginals` shows each component of a joint distribution -- density plots for real components and histograms for categorical components.
 
-### `viz.auto`
+#### Automatic visualization
 
-`viz.auto` tries to automatically construct a suitable visualization based on the types of the items in the ERP support.
+`viz.auto` tries to automatically construct a useful visualization based on the types of the different components in the posterior.
 
 Options:
 
 - `summarize` (default = false). (TODO) For data with real-valued components, you can either try to show all the data (scatter plot) or summarize by showing a density estimate (heat map). This option has no effect if data is entirely categorical.
 
-### Data types
+##### Data types
 
 First, a bit of notation: `c` stands for categorical variables and `r` for real variables (for now, ordinal variables are treated as categorical).
 
-Some examples of types for different supports:
+Some examples of types:
 
-- Every support element is a string → type is `c`
-- Every support element is an integer → type is `c`
-- Every support element is a real number → type is `r`
-- Every support element is an object `{k1: <a>, k2: <b>}` → `<a><b>`
-	- (e.g., if `<a>` is `r` and `<b>` is `c`, then the type is `rc`)
-- Every support element is an array `[<a>,<b>]` → type is `<a><b>`
-	- (e.g., if `<a>` is `r` and `<b>` is `c`, then the type is `rc`)
+| Support element | Type                         | Notes                                              |
+| --------------- | ---------------------------- | -------------------------------------------------- |
+| String          | `c`                          |                                                    |
+| Integer         | `c`                          |                                                    |
+| Real number     | `r`                          |                                                    |
+| Object          | combined types of all values | The type of `{fruit: 'apple', price: 3.6}` is `rc` |
+| Array           | combined types of all values | The type of `[9.2, 8.1, 'candy bar']` is `rrc`     |
 
-### Type renderings
+
+##### How each type is visualized
 
 - `c`: histogram
 - `r`: density curve
@@ -146,7 +147,7 @@ Some examples of types for different supports:
 - `crrr`: trellis parallel coordinates plot (TODO)
 - `ccrrr`: trellis parallel coordinates plot (TODO)
 
-## Developing
+### Development notes
 
 ```sh
 grunt setup-demo       # make webppl and webppl-editor dependencies for demo
