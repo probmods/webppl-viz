@@ -101,9 +101,13 @@ TODO: expose this functionality to end users
 
 - `viz.parcoords(erp)`
 
-## Automatic function
+## Automatic functions
 
-There is currently only one automatic function: `viz.auto(erp, [options])`
+### `viz.marginals`
+
+`viz.marginals` shows each component of a joint distribution -- density plots for real components and histograms for categorical components.
+
+### `viz.auto`
 
 `viz.auto` tries to automatically construct a suitable visualization based on the types of the items in the ERP support.
 

@@ -1298,6 +1298,35 @@ function table(obj, options) {
 
 }
 
+// TODO: display in a wrapped row
+// TODO: optimize
+function marginals(erp, options) {
+  var fullSupport = erp.support(),
+      fullScores = getScores(erp),
+      fullTable = _.map(fullScores, function(score, i) {
+        return _.extend({__score__: score}, fullSupport[i])
+      }),
+      fields = _.keys(fullSupport[0]);
+
+  _.each(
+    fields,
+    function(field) {
+      var support = _.unique(_.pluck(fullSupport, field)); // extract field of interest
+
+      var fauxErp = {
+        support: function() { return support },
+        score: function(fieldValue) {
+          var rows = _.where(fullTable, _.object([field], [fieldValue]));
+          var scores = _.pluck(rows, '__score__');
+          return util.logsumexp(scores);
+        }
+      }
+
+      print(field + ":")
+      viz.auto(fauxErp, options)
+    }
+  )
+}
 
 
 var viz = {
@@ -1309,7 +1338,8 @@ var viz = {
   density: density,
   line: lineWrapper,
   table: table,
-  heatMap: heatMap
+  heatMap: heatMap,
+  marginals: marginals
 }
 
 if (typeof module !== 'undefined' && module.exports) {
