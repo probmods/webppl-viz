@@ -28,10 +28,10 @@ function catchAll(fn) {
   };
 }
 
-var version = catchAll(git('rev-parse --short HEAD'))('.');
+var hash = catchAll(git('rev-parse --short HEAD'))('.');
+var tag = catchAll(git('describe --exact-match --tags ' + hash))('.');
 
 AWS.config.update({region: 'us-west-2'});
-
 
 var getFile = function(name) {
   return fs.createReadStream(name).pipe(zlib.createGzip());
@@ -62,16 +62,34 @@ var upload = function(params) {
     });
 }
 
-var jsParams = {
-  Key: 'webppl-viz-' + version + '.js',
+// upload with hash filenames
+
+upload({
+  Key: 'webppl-viz-' + hash + '.js',
   Body: getFile('bundle/webppl-viz.js'),
   ContentType: 'application/javascript'
-};
-upload(jsParams);
+});
 
-var cssParams = {
-  Key: 'webppl-viz-' + version + '.css',
+upload({
+  Key: 'webppl-viz-' + hash + '.css',
   Body: getFile('bundle/webppl-viz.css'),
   ContentType: 'text/css'
-};
-upload(cssParams);
+});
+
+// upload with tag filename if applicable
+
+// TODO: switch this to a copying action
+if (tag !== '') {
+  upload({
+    Key: 'webppl-viz-' + tag + '.js',
+    Body: getFile('bundle/webppl-viz.js'),
+    ContentType: 'application/javascript'
+  });
+
+  upload({
+    Key: 'webppl-viz-' + tag + '.css',
+    Body: getFile('bundle/webppl-viz.css'),
+    ContentType: 'text/css'
+  });
+
+}
