@@ -173,7 +173,7 @@ kindPrinter.r = function(args, options) {
     "data": {"values": densityEstimates},
     "mark": "line",
     encoding: {
-      x: {"type": "quantitative", "field": "item", axis: {title: fieldName}},
+      x: {"type": "quantitative", "field": "item", axis: {title: fieldName}, scale: {zero: false}},
       y: {"type": "quantitative", "field": "density"}
     }
   };
@@ -256,7 +256,7 @@ kindPrinter.cr = function(args, options) {
     "data": {"values": densityEstimatesTidied},
     "mark": "line",
     encoding: {
-      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}},
+      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}, scale: {zero: false}},
       y: {"type": "quantitative", "field": "density"},
       color: {"type": "nominal", "field": cDimName, axis: {title: cDimName}}
     }
@@ -280,8 +280,8 @@ kindPrinter.rr = function(args, options) {
     data: {values: data},
     mark: "point",
     encoding: {
-      x: {field: field1Name, type: "quantitative"},
-      y: {field: field2Name, type: "quantitative"},
+      x: {field: field1Name, type: "quantitative", scale: {zero: false}},
+      y: {field: field2Name, type: "quantitative", scale: {zero: false}},
       size: {field: 'prob', type: 'quantitative'},
       color: {field: 'prob', type: 'quantitative'},
       order: {"field": 'prob', "type": "quantitative", "sort": "ascending"}
@@ -384,7 +384,7 @@ kindPrinter.ccr = function(args, options) {
     "data": {"values": densityEstimatesTidied},
     "mark": "line",
     encoding: {
-      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}},
+      x: {"type": "quantitative", "field": "item", axis: {title: rDimName}, scale: {zero: false}},
       y: {"type": "quantitative", "field": "density"},
       color: {"type": "nominal", "field": cDimName, axis: {title: cDimName}},
       column: {type: 'nominal', field: facetDimName}
@@ -414,8 +414,8 @@ kindPrinter.crr = function(args, options) {
     mark: "point",
     encoding: {
       column: {field: cDimNames[0], type: "nominal"},
-      x: {field: rDimNames[0], type: "quantitative"},
-      y: {field: rDimNames[1], type: "quantitative"},
+      x: {field: rDimNames[0], type: "quantitative", scale: {zero: false}},
+      y: {field: rDimNames[1], type: "quantitative", scale: {zero: false}},
       size: {field: 'prob', type: 'quantitative'},
       color: {field: 'prob', type: 'quantitative'},
       order: {'field': 'prob', 'type': 'quantitative', 'sort': 'ascending'}
@@ -1191,7 +1191,7 @@ function density(x, options) {
       "x": {"field": "item",
             "type": "quantitative",
             axis: {title: 'Value'},
-            scale: {domain: [min,max]}
+            scale: {domain: [min,max], zero: false}
            },
       "y": {"field": "density","type": "quantitative", axis: {title: 'Density'}}
     },

@@ -42,21 +42,20 @@
      pre {
          font-size: 12px;
      }
+
+     .col {
+         float: left;
+         width: 45%;
+         margin-left: 1%
+     }
     </style>
   </head>
   <body>
+    <div class="col">
     scratch pad:
-    <pre id="testing"><code></code></pre>
+      <pre id="testing"><code></code></pre>
 
-    silverman's rule can fail:
-    <pre><code>var model = function() {
-  var m = flip() ? 10 : -10;
-  return gaussian(m,1);
-}
-var dist = Rejection(model, {samples: 200});
-viz.hist(dist)
-viz.density(dist)</code></pre>
-
+      <h3>functionality</h3>
     primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
 viz.hist(repeat(1e4, function() { return uniformDraw(['a','b','c']) }))
@@ -84,6 +83,15 @@ viz.heatMap(repeat(2e2, function() { return [gaussian(0,1), beta(0.5,0.5)] })) <
     <pre><code>viz.auto(ParticleFilter(function() {
   return {x: beta(3,2)};
 },500))</code></pre>
+
+    marginals:
+    <pre><code>
+viz.marginals(MH(function() {
+  return {x1: uniform(0,1),
+          x2: uniformDraw(['fruit', 'vegetable'])
+         }
+}, 100))
+    </code></pre>
 
     cc:
     <pre><code>viz.auto(Enumerate(function() {
@@ -167,15 +175,26 @@ viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 1000000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 10000000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 100000000}; },500))
     </code></pre>
+    </div>
+    <div class="col">
+      <h3>regression testing</h3>
 
-    marginals:
-    <pre><code>
-viz.marginals(MH(function() {
-  return {x1: uniform(0,1),
-          x2: uniformDraw(['fruit', 'vegetable'])
-         }
-}, 100))
-    </code></pre>
+      silverman's rule can fail:
+      <pre><code>var model = function() { gaussian(flip() ? 30 : -30, 1); }
+var dist = Rejection(model, {samples: 200});
+viz.hist(dist)
+viz.density(dist)</code></pre>
+
+      make sure x axis doesn't force lower bound of zero:
+      <pre><code>
+      var model = function() { return gaussian(1000,20) }
+var dist = MH(model, 500)
+viz.density(dist)
+viz.auto(dist)
+      </code></pre>
+
+  </div>
+
 
   </body>
 <script>
