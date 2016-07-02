@@ -1074,13 +1074,25 @@ function scatterWrapper() {
   }
 }
 
-
 // TODO: figure out more idiomatic way of reducing empty space around heatmap
 // TODO: add numBins option, log option
-function heatMap(samples) {
+// TODO: for erps, do weighted kde2d instead of passing n in options and converting to samples
+function heatMap(arg, options) {
+  var samples = [];
 
-  if (isErp(samples)) {
-    throw new Error('erp arguments to heat map not yet supported')
+  if (!isErp(arg)) {
+    samples = arg;
+  } else {
+    var n = options.n;
+    var support = arg.support();
+
+    support.forEach(function(s) {
+      var prob = Math.exp(arg.score(s)),
+          m = Math.round(n * prob);
+      for(var i = 0; i < m; i++) {
+        samples.push(s)
+      }
+    })
   }
 
   var x, y;
@@ -1095,65 +1107,104 @@ function heatMap(samples) {
 
   var densityEstimate = kde2d(x,y);
 
-  var formatter = d3.format('.1e');
-  _.forEach(densityEstimate,
-            function(row) {
-              row.x = formatter(row.x);
-              row.y = formatter(row.y);
-            })
+  // var formatter = d3.format('.1e');
+  // _.forEach(densityEstimate,
+  //           function(row) {
+  //             row.x = formatter(row.x);
+  //             row.y = formatter(row.y);
+  //           })
 
   var spec = {
-    data: [{'name': 'csv', values: densityEstimate}],
-    "padding": {"left": 50, "top": 10, "right": 150, "bottom": 50},
+    data: [{name: 'csv', values: densityEstimate}],
+    "width": 350,
+    "height": 350,
     "scales": [
       {
         "name": "x",
-        "type": "ordinal",
-        "domain": {"data": "csv","field": "x"},
-        "range": "width"
+        "type": "linear",
+        "domain": {
+          "data": "csv",
+          "field": "x"
+        },
+        "range": "width",
+        "zero": false
       },
       {
         "name": "y",
-        "type": "ordinal",
-        "domain": {"data": "csv","field": "y"},
+        "type": "linear",
+        "domain": {
+          "data": "csv",
+          "field": "y"
+        },
         "range": "height",
-        "reverse": true
+        "zero": false
       },
       {
         "name": "c",
         "type": "linear",
-        "domain": {"data": "csv","field": "density"},
-        "range": ["#ffffff","#313695"]
+        "domain": {
+          "data": "csv",
+          "field": "density"
+        },
+        "range": [
+          "#ffffff",
+          "#313695"
+        ]
       }
     ],
     "axes": [
-      {"type": "x","scale": "x","format": ".1e",
-       "properties": {"labels": {"angle": {"value": 45}, "align": {"value": "left"}}}
-
+      {
+        "type": "x",
+        "scale": "x",
+        "offset": 16,
+        "ticks": 10,
+        "properties": {
+          "labels": {
+            "angle": {
+              "value": 45
+            },
+            "align": {
+              "value": "left"
+            }
+          }
+        }
       },
-      {"type": "y","scale": "y","format": ".1e"
-
+      {
+        "type": "y",
+        "scale": "y",
+        "offset": 16,
+        "ticks": 10
       }
     ],
     "marks": [
       {
-        "type": "rect",
-        "from": {"data": "csv"},
+        "type": "symbol",
+        "from": {
+          "data": "csv"
+        },
         "properties": {
           "enter": {
-            "x": {"scale": "x","field": "x"},
-            "width": {"scale": "x","band": true},
-            "y": {"scale": "y","field": "y"},
-            "height": {"scale": "y","band": true},
-            "fill": {"scale": "c","field": "density"},
-            "stroke": {"value": "#dddddd"},
-            "strokeWidth": {"value": "0.2"}
+            "shape": {"value": "square"},
+            "x": {
+              "scale": "x",
+              "field": "x"
+            },
+            "size": {"value": 210},
+            "y": {
+              "scale": "y",
+              "field": "y"
+            },
+            "fill": {
+              "scale": "c",
+              "field": "density"
+            }
           }
         }
       }
     ],
-    "legends": [{"fill": "c", "values": [0, _.max(_.pluck(densityEstimate, 'density'))]}],
-    "config": {"numberFormat": ".1e"}
+    "legends": [{
+      "title": "density",
+      "fill": "c", "values": [0, _.max(_.pluck(densityEstimate, 'density'))]}]
   };
 
   renderSpec(spec, {regularVega: true})
@@ -1300,6 +1351,7 @@ function table(obj, options) {
 
 // TODO: display in a wrapped row
 // TODO: optimize
+// TODO: build as single vega spec with group marks
 function marginals(erp, options) {
   var fullSupport = erp.support(),
       fullScores = getScores(erp),
