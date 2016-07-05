@@ -1,0 +1,209 @@
+/*
+  (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; webppl src/multi.wppl\n")))
+*/
+
+var findKey = function(obj, pred) {
+  var pairs = _.pairs(obj)
+  var filtered = filter(function(pair) { return pred(pair[1], pair[0]) },
+                        pairs);
+  return filtered[0][0];
+}
+
+var mappingSamplers = {
+  freqtable: function(fieldData) {
+    // assumes 0 r
+    var n = _.size(fieldData), fields = _.keys(fieldData), types = _.pluck(fieldData, 'type');
+
+    // TODO: sample a permutation of fields
+
+    var d = {
+      '1': ['col'],
+      '2': ['col','row'],
+      '3': ['col','row','facetCol'],
+      '4': ['col','row','facetCol','facetRow']
+    }
+
+    return _.object(fields, d[n + '']);
+  },
+  hist: function(fieldData) {
+    var n = _.size(fieldData), fields = _.keys(fieldData), types = _.pluck(fieldData, 'type');
+
+    if (n == 1) {
+      // TODO: possibly use color?
+      return _.object(fields, ['x'])
+    } else if (n == 2) {
+      return _.object(fields, ['x', uniformDraw(['color','facetCol'])])
+    } else if (n == 3) {
+      return _.object(fields, ['x', 'color', 'facetCol']);
+    } else if (n == 4) {
+      return _.object(fields, ['x','color','facetCol', 'facetRow']);
+    } else {
+      console.log("too many fields");
+      return process.exit();
+    }
+  },
+  scatter: function(fieldData) {
+    // TODO: do something different for 1r versus 2r
+  }
+}
+
+var specMakers = {
+  hist: function(mappings) {
+    var k = _.size(mappings);
+    var xSource = findKey(mappings, function(v) { return v == 'x'} );
+
+    // convention: scale names are data fields, not visual aesthetics
+    var scales = [
+      {
+        name: 'prob',
+        type: 'linear',
+        // domain: {data: 'raw', field: 'prob'},
+        domain: [0,1],
+        range: 'height'
+      },
+      {
+        name: xSource,
+        type: 'ordinal',
+        domain: {data: 'raw', field: xSource},
+        range: 'width',
+        padding: 0.2
+      }
+    ];
+
+    var axes = [
+      {
+        name: 'prob',
+        type: 'y',
+        scale: 'prob',
+        title: 'Probability'
+      },
+      {
+        name: xSource,
+        type: 'x',
+        scale: xSource,
+        title: xSource
+      }
+    ];
+
+    var marks = [
+      {type: 'rect',
+       from: {data: 'raw'},
+       properties: {
+         update: {
+           x: {scale: xSource, field: xSource},
+           width: {scale: xSource, band: true, offset: -1},
+           y: {scale: 'prob', field: '__prob__'},
+           y2: {scale: 'prob', value: 0},
+           fill: {value: 'steelblue'}
+         }
+       }
+      }
+    ];
+
+    return {
+      scales: scales,
+      axes: axes,
+      marks: marks
+    }
+  }
+}
+
+var sampleGraph = function(fieldData) {
+  var types = _.pluck(fieldData, 'type'),
+      n = _.size(fieldData),
+      nR = filter(function(t) { return t == 'r' }, types).length,
+      nC = n - nR,
+      typesString = types.join('');
+
+  var possibleMarks = [
+    ['freqtable','hist'],  // 0 r
+    ['scatter','density'], // 1 r
+    ['scatter','heat'],    // 2 r
+    ['parcoords']          // 3 r
+  ][nR > 3 ? 3 : nR];
+
+  var mark = uniformDraw(possibleMarks);
+  condition(mark == 'hist')
+
+  // sample mappings for this mark
+  var mappingSampler = mappingSamplers[mark],
+      mappings = mappingSampler(fieldData);
+
+  // make vega spec
+  var specMaker = specMakers[mark],
+      spec = specMaker(mappings);
+
+  /* conditions:
+     - prefer colors over facet cols
+     - prefer facet cols over facet rows
+     - prefer fewer colors
+  */
+
+  var out = {mark: mark,
+             mappings: mappings,
+             spec: spec};
+  return out;
+}
+
+
+
+
+var getColumnType = function(columnValues) {
+  // for now, support real, integer, and categorical
+  // some questions:
+  // - can we support list of reals a la dirichlet?
+  // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
+  if (_.every(columnValues, _.isNumber)) {
+    return _.every(columnValues, Number.isInteger) ? 'categorical' : 'real'
+  } else {
+    return 'categorical'
+  }
+};
+
+var getColumnTypes = function(df) {
+  var columnNames = _.keys(df[0]);
+  return _.object(
+    columnNames,
+    map(function(name) {
+      if (name == '__prob__') {
+        return 'real'
+      } else {
+        return getColumnType(_.pluck(df, name));
+      }
+    }, columnNames)
+  )
+};
+
+var multi = function(dist) {
+  var states = dist.support();
+
+  var distDf = map(function(x) { _.extend({__prob__: Math.exp(dist.score(x))},
+                                          x)},
+                   states)
+
+  var types = _.omit(getColumnTypes(distDf), '__prob__');
+
+  var graphDist = Rejection(function() {  sampleGraph(types) } );
+
+  var spec = graphDist.support()[0].spec;
+  var fullSpec = _.extend({data: [{name: "raw", values: distDf} ]},
+                          spec);
+
+  return fullSpec;
+}
+
+util.seedRNG(1)
+
+
+var posterior = Enumerate(function() {
+  return {a: flip(0.6) ? 'foo' : 'bar'}
+})
+
+
+//JSON.stringify(multi(posterior),null,1)
+
+// y = prob, x = country, color = version, facetRow = brand, facetCol = season
+// idea: recursively create group marks until we reach a base condition:
+// - freq table: only y and x remain
+// - hist: only y and x and remain.
+// - scatter 1d: only x remains
