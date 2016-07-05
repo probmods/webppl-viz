@@ -872,7 +872,9 @@ function renderSpec(spec, _options) {
       ReactDOM.render(r, resultContainer, function() {
         var comp = this;
         var node = this.refs.content;
-        $(node).html('&nbsp;&nbsp;&nbsp&nbsp;rendering...');
+        $(node)
+          .css({'min-height': 255})
+          .html('&nbsp;&nbsp;&nbsp&nbsp;Rendering graph...');
 
         vg.parse.spec(vgSpec,
                       function(error, chart) {
