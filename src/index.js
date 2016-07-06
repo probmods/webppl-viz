@@ -1078,7 +1078,7 @@ function scatterWrapper() {
 
 // TODO: figure out more idiomatic way of reducing empty space around heatmap
 // TODO: add numBins option, log option
-// TODO: for erps, do weighted kde2d instead of passing n in options and converting to samples
+// TODO: for erps, do weighted kde2d instead of passing n in options and converting to samples (look at http://stackoverflow.com/q/3985135/351392)
 function heatMap(arg, options) {
   var samples = [];
 
