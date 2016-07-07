@@ -816,7 +816,7 @@ function renderSpec(spec, _options) {
               return {key: key,
                       score: score + (key == '.1e' ? 1 : 0),
                       strings: strings,
-                      stringsAdjusted
+                      stringsAdjusted: stringsAdjusted
                      } // extra penalty for .1e
             });
 
