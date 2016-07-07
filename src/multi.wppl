@@ -106,7 +106,7 @@ var sampleGraph = function(distDf) {
 var specMakers = {
   hist: function(_mappings /* logical -> physical */, _distDf) {
     var k = _.size(_mappings);
-    var _mappingsI = _.invert(_mappings); // physical -> logical
+    var _mappingsI = _.invert(_mappings);
 
     var presentAesthetics = _.keys(_mappingsI),
         missingAesthetics = _.difference(['x','facetRow','facetCol','color'], presentAesthetics);
@@ -115,10 +115,12 @@ var specMakers = {
 
     var facetLogicalNames = {facetRow: 'gy', facetCol: 'gx', color: 'gc'};
 
-    var mappings = _.extend(_.object(map(function(name) { return [facetLogicalNames[name], name]  },
+    // logical to physical
+    var LP = _.extend(_.object(map(function(name) { return [facetLogicalNames[name], name]  },
                                 missingAesthetics)),
-                            _mappings);
-    var mappingsI = _.invert(mappings);
+                      _mappings);
+    // physical to logical
+    var PL = _.invert(LP);
 
     // add dummy columns to data
     var distDf = missingAesthetics.length == 0
@@ -130,8 +132,8 @@ var specMakers = {
 
     // start building spec from the bottom up
 
-    var xSource = mappingsI.x;
-    var colorSource = mappingsI.color;
+    var xSource = PL.x;
+    var colorSource = PL.color;
 
     var marks2 = [
       {name: 'marks2',
@@ -176,8 +178,8 @@ var specMakers = {
        type: 'group',
        properties: {
          update: {
-           x: {scale: "gx",field: mappingsI.facetCol},
-           y: {scale: "gy",field: mappingsI.facetRow},
+           x: {scale: "gx",field: PL.facetCol},
+           y: {scale: "gy",field: PL.facetRow},
            width: {scale: "gx", band: true, offset: 0},
            height: {scale: "gy", band: true, offset: 0},
            stroke: {value: "#ccc"},
@@ -186,7 +188,7 @@ var specMakers = {
        },
        from: {
          data: "raw",
-         transform: [{type: "facet",groupby: [mappingsI.facetRow, mappingsI.facetCol]}]
+         transform: [{type: "facet",groupby: [PL.facetRow, PL.facetCol]}]
        },
        scales: [
          {
@@ -221,14 +223,14 @@ var specMakers = {
       {
         name: 'gx',
         type: 'ordinal',
-        domain: {data: 'raw', field: mappingsI.facetCol},
+        domain: {data: 'raw', field: PL.facetCol},
         range: 'width',
         padding: 0.1
       },
       {
         name: 'gy',
         type: 'ordinal',
-        domain: {data: 'raw', field: mappingsI.facetRow},
+        domain: {data: 'raw', field: PL.facetRow},
         range: 'height',
         padding: 0.1
       }
@@ -241,14 +243,14 @@ var specMakers = {
         scale: "gy",
         orient: "left",
         tickSize: 0,
-        title: mappingsI.facetRow,
+        title: PL.facetRow,
         properties: {axis: {strokeWidth: {value: 1}}}
       },
       {
         type: "x",
         scale: "gx",
         tickSize: 0,
-        title: mappingsI.facetCol,
+        title: PL.facetCol,
         properties: {
           axis: {strokeWidth: {value: 1}},
           title: {angle: 0}
