@@ -138,11 +138,12 @@ var specMakers = {
        type: 'rect',
        properties: {
          update: {
-           x:     {scale: 'colorPosScale', field: colorSource},
-           width: {scale: 'colorPosScale', band: true, offset: 0},
-           y:     {scale: 'probScale', field: '__prob__'},
-           y2:    {scale: 'probScale', value: 0},
-           fill:  {scale: 'colorColorScale', field: colorSource}
+           x:      {scale: 'colorPosScale', field: colorSource},
+           width:  {scale: 'colorPosScale', band: true, offset: 0},
+           y:      {scale: 'probScale', field: '__prob__'},
+           y2:     {scale: 'probScale', value: 0},
+           fill:   {scale: 'colorColorScale', field: colorSource},
+           opacity: {value: 0.7}
          }
        }
       }
