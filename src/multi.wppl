@@ -199,7 +199,7 @@ var specMakers = {
          {
            name: "probScale",
            type: "linear",
-           domain: {field: "__prob__"}, // TODO: make a random choice between data domain and [0,1]?
+           domain: {data: 'raw', field: "__prob__"}, // TODO: make a random choice between data domain and [0,1]?
            range: "height"
          },
          {
@@ -285,11 +285,10 @@ var multi = function(dist) {
 util.seedRNG(3)
 
 var posterior = Enumerate(function() {
-  return {a: flip(0.6) ? 'foo' : 'bar',
-          b: flip(0.7) ? 'baz' : 'quux'
+  var boolA = flip(0.6);
+  return {alpha: boolA ? 'foo' : 'bar',
+          beta: flip(boolA ? 0.9 : 0.7) ? 'baz' : 'quux'
          }
 })
-
-
 
 JSON.stringify(multi(posterior),null,1)
