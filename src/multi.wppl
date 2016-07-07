@@ -136,7 +136,6 @@ var specMakers = {
     var marks2 = [
       {name: 'marks2',
        type: 'rect',
-       from: {data: 'raw'},
        properties: {
          update: {
            x:     {scale: 'colorPosScale', field: colorSource},
