@@ -113,7 +113,7 @@ var specMakers = {
 
     // add dummy columns (facetRow, facetCol, or color) to mappings dictionaries
 
-    var facetLogicalNames = {facetRow: 'gy', facetCol: 'gx'};
+    var facetLogicalNames = {facetRow: 'gy', facetCol: 'gx', color: 'gc'};
 
     var mappings = _.extend(_.object(map(function(name) { return [facetLogicalNames[name], name]  },
                                 missingAesthetics)),
@@ -186,7 +186,7 @@ var specMakers = {
        },
        from: {
          data: "raw",
-         transform: [{type: "facet",groupby: ["gx","gy"]}]
+         transform: [{type: "facet",groupby: [mappingsI.facetRow, mappingsI.facetCol]}]
        },
        scales: [
          {
@@ -282,7 +282,7 @@ var multi = function(dist) {
   return spec;
 }
 
-util.seedRNG(1)
+util.seedRNG(3)
 
 var posterior = Enumerate(function() {
   return {a: flip(0.6) ? 'foo' : 'bar',
