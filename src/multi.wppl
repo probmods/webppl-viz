@@ -2,14 +2,27 @@
   (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; webppl src/multi.wppl\n")))
 */
 
+// NB: doesn't work for lists with duplicate elements
+var samplePermutation = function(xs) {
+  if (xs.length == 0) {
+    return []
+  } else {
+    var x = uniformDraw(xs);
+    return [x].concat(samplePermutation(_.without(xs, x)));
+  }
+}
+
+var err = function(msg) {
+  console.error(msg);
+  process.exit()
+}
+
 var multi = function(dist) {
 
   var mappingSamplers = {
     freqtable: function(fieldTypes) {
       // assumes 0 r
       var n = _.size(fieldTypes), fields = _.keys(fieldTypes), types = _.pluck(fieldTypes, 'type');
-
-      // TODO: sample a permutation of fields
 
       var d = {
         '1': ['col'],
@@ -21,7 +34,8 @@ var multi = function(dist) {
       return _.object(fields, d[n + '']);
     },
     hist: function(fieldTypes) {
-      var n = _.size(fieldTypes), fields = _.keys(fieldTypes), types = _.pluck(fieldTypes, 'type');
+      var n = _.size(fieldTypes),
+          fields = samplePermutation(_.keys(fieldTypes));
 
       if (n == 1) {
         // TODO: possibly use color?
@@ -33,12 +47,44 @@ var multi = function(dist) {
       } else if (n == 4) {
         return _.object(fields, ['x','color','facetCol', 'facetRow']);
       } else {
-        console.log("too many fields");
-        return process.exit();
+        return err("too many fields");
       }
     },
     scatter: function(fieldTypes) {
+      var n = _.size(fieldTypes),
+          fields = samplePermutation(_.keys(fieldTypes)),
+          types = _.values(fieldTypes),
+          nR = _.countBy(types).r;
+
       // TODO: do something different for 1r versus 2r
+      var aesthetics =
+          ((nR == 1)
+           ? ((n == 1) ? ['x'] :
+              (n == 2) ? ['x', uniformDraw(['color','y'])] :
+              (n == 3) ? ['x', 'color', 'facetCol'] :
+              (n == 4) ? ['x','color','facetCol', 'facetRow'] :
+              err("too many fields")) :
+           // nR == 2
+           ((nR ==2))
+           ? ((n == 2) ? ['x','y'] :
+              (n == 3) ? ['x','y',uniformDraw(['color','facetCol'])] :
+              (n == 4) ? ['x','y','color','facetCol'] :
+              (n == 5) ? ['x','y','color','facetCol', 'facetRow'] :
+              err("too many fields"))
+           : err("nR = " + nR)
+          )
+
+      var out = _.object(fields, aesthetics),
+          outI = _.invert(out);
+
+      // forbid any r fields from being mapped to facetCol and facetRow
+      condition(fieldTypes[outI.facetCol] !== 'r' &&
+                fieldTypes[outI.facetRow] !== 'r' &&
+                fieldTypes[outI.color] !== 'r')
+
+      return out;
+    },
+    density: function(fieldTypes) {
     }
   }
 
@@ -83,7 +129,8 @@ var multi = function(dist) {
     ][nR > 3 ? 3 : nR];
 
     var mark = uniformDraw(possibleMarks);
-    condition(mark == 'hist')
+    // condition(mark == 'hist')
+    condition(mark == 'scatter')
 
     // sample mappings for this mark
     var mappingSampler = mappingSamplers[mark],
@@ -91,7 +138,7 @@ var multi = function(dist) {
 
     // make vega spec
     var specMaker = specMakers[mark],
-    spec = specMaker(mappings, distDf);
+        spec = specMaker(mappings, distDf, fieldTypes);
 
     /* conditions:
        - prefer colors over facet cols
@@ -106,7 +153,7 @@ var multi = function(dist) {
   };
 
   var specMakers = {
-    hist: function(_mappings, _distDf) {
+    hist: function(_mappings, _distDf, fieldTypes) {
       var k = _.size(_mappings);
       var _mappingsI = _.invert(_mappings);
 
@@ -115,7 +162,7 @@ var multi = function(dist) {
 
       // add dummy columns (facetRow, facetCol, or color) to mappings dictionaries
 
-      // TODO: when we have dummy facets, why do logical field names and scale names need to be the same (e.g. "gx")
+      // TODO: when we have dummy facets, why do logical field names and scale names need to be the same? (e.g. "gx")
       // for the padding to be correct?
       var facetLogicalNames = {facetRow: 'gy', facetCol: 'gx', color: 'gc'};
 
@@ -245,6 +292,7 @@ var multi = function(dist) {
         scale: "gy",
         orient: "left",
         tickSize: 0,
+        offset: 30,
         title: PL.facetRow,
         properties: {axis: {strokeWidth: {value: 1}}}
       };
@@ -252,6 +300,7 @@ var multi = function(dist) {
         type: "x",
         scale: "gx",
         tickSize: 0,
+        offset: 30,
         title: PL.facetCol,
         properties: {
           axis: {strokeWidth: {value: 1}},
@@ -266,8 +315,9 @@ var multi = function(dist) {
           );
 
       var viz = {
-        width: 250,
-        height: 250,
+        regularVega: true,
+        width: 300,
+        height: 300,
         data: [{"name": "raw", "values": distDf}],
         scales: facetScales,
         axes: facetAxes,
@@ -275,6 +325,42 @@ var multi = function(dist) {
       };
 
       return viz;
+    },
+    scatter: function(_mappings, _distDf, fieldTypes) {
+      var LP = _mappings;
+      var PL = _.invert(LP);
+
+      var toVlAesthetic = {facetCol: 'column',
+                           facetRow: 'row',
+                           x: 'x',
+                           y: 'y',
+                           color: 'color'
+                          };
+      var toVlType = {'c': 'nominal', 'r': 'quantitative'};
+
+      // e.g.,
+      // {
+      //   x: {field: PL.x, type: toVlType[fieldTypes[PL.x]]},
+      //   y: {field: PL.y, type: toVlType[fieldTypes[PL.y]]}
+      // }
+      var encodings = _.object(map(
+        function(aesthetic) {
+          var field = PL[aesthetic],
+              type = fieldTypes[field],
+              vlType = toVlType[type];
+
+          return [toVlAesthetic[aesthetic], {field: field, type: vlType}]
+        },
+        _.keys(PL)
+      ))
+
+      var out = {
+        regularVega: false,
+        data: {values: _distDf},
+        mark: "point",
+        encoding: _.extend({size: {field: '__prob__', type: 'quantitative'}}, encodings)
+      }
+      return out
     }
   }
 
@@ -284,17 +370,25 @@ var multi = function(dist) {
 
   var graphDist = Enumerate(function() { sampleGraph(distDf) });
 
-  map(function(abs) { viz.renderSpec(abs.spec, {regularVega: true, smartAxes: false}) },
+  map(function(abs) {
+    if (typeof viz !== 'undefined' /* browser */) {
+      viz.renderSpec(abs.spec, {regularVega: abs.spec.regularVega, smartAxes: false})
+    } else {
+      console.log(JSON.stringify(abs.mappings, null, 1))
+    }
+  },
       graphDist.support())
 
   return ""
 }
 
-// util.seedRNG(3)
-// var posterior = Enumerate(function() {
-//   var boolA = flip(0.6);
-//   return {alpha: boolA ? 'foo' : 'bar',
-//           beta: flip(boolA ? 0.9 : 0.7) ? 'baz' : 'quux'
-//          }
-// })
-// JSON.stringify(multi(posterior),null,1)
+if (typeof window == 'undefined') {
+  util.seedRNG(3)
+  var posterior = MH(function() {
+    return {skill: gaussian(0,1),
+            group: uniformDraw(['a','b'])
+           }
+  }, 100)
+  multi(posterior)
+}
+''
