@@ -1,5 +1,5 @@
 /*
-  (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; webppl src/multi.wppl\n")))
+  (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; webppl src/multi.wppl --require .\n")))
 */
 
 // NB: doesn't work for lists with duplicate elements
@@ -56,7 +56,6 @@ var multi = function(dist) {
           types = _.values(fieldTypes),
           nR = _.countBy(types).r;
 
-      // TODO: do something different for 1r versus 2r
       var aesthetics =
           ((nR == 1)
            ? ((n == 1) ? ['x'] :
@@ -65,13 +64,13 @@ var multi = function(dist) {
               (n == 4) ? ['x','color','facetCol', 'facetRow'] :
               err("too many fields")) :
            // nR == 2
-           ((nR ==2))
-           ? ((n == 2) ? ['x','y'] :
-              (n == 3) ? ['x','y',uniformDraw(['color','facetCol'])] :
-              (n == 4) ? ['x','y','color','facetCol'] :
-              (n == 5) ? ['x','y','color','facetCol', 'facetRow'] :
-              err("too many fields"))
-           : err("nR = " + nR)
+           ((nR == 2)
+            ? ((n == 2) ? ['x','y'] :
+               (n == 3) ? ['x','y',uniformDraw(['color','facetCol'])] :
+               (n == 4) ? ['x','y','color','facetCol'] :
+               (n == 5) ? ['x','y','color','facetCol', 'facetRow'] :
+               err("too many fields"))
+            : err("nR = " + nR))
           )
 
       var out = _.object(fields, aesthetics),
@@ -85,6 +84,35 @@ var multi = function(dist) {
       return out;
     },
     density: function(fieldTypes) {
+      var n = _.size(fieldTypes),
+          fields = samplePermutation(_.keys(fieldTypes)),
+          types = _.values(fieldTypes),
+          nR = _.countBy(types).r;
+
+      // TODO: do something different for 1r versus 2r
+      var aesthetics =
+          ((nR == 1)
+           ? ((n == 1) ? ['x'] :
+              (n == 2) ? ['x', uniformDraw(['color','facetCol'])] :
+              (n == 3) ? ['x', 'facetCol', uniformDraw(['facetRow', 'color'])] :
+              (n == 4) ? ['x','color','facetCol', 'facetRow'] :
+              err("too many fields")) :
+           // nR == 2
+           ((nR == 2)
+            ? err("should use heat map for nR == 2")
+            : err("nR = " + nR))
+          )
+
+      var out = _.object(fields, aesthetics),
+          outI = _.invert(out);
+
+      // forbid any r fields from being mapped to facetCol and facetRow
+      condition(fieldTypes[outI.facetCol] !== 'r' &&
+                fieldTypes[outI.facetRow] !== 'r' &&
+                fieldTypes[outI.color] !== 'r')
+
+      return out;
+
     }
   }
 
@@ -130,7 +158,7 @@ var multi = function(dist) {
 
     var mark = uniformDraw(possibleMarks);
     // condition(mark == 'hist')
-    condition(mark == 'scatter')
+    condition(mark == 'density')
 
     // sample mappings for this mark
     var mappingSampler = mappingSamplers[mark],
@@ -152,6 +180,13 @@ var multi = function(dist) {
     return out;
   };
 
+  var toVlAesthetic = {facetCol: 'column',
+                       facetRow: 'row',
+                       x: 'x',
+                       y: 'y',
+                       color: 'color'
+                      };
+  var toVlType = {'c': 'nominal', 'r': 'quantitative'};
   var specMakers = {
     hist: function(_mappings, _distDf, fieldTypes) {
       var k = _.size(_mappings);
@@ -330,13 +365,6 @@ var multi = function(dist) {
       var LP = _mappings;
       var PL = _.invert(LP);
 
-      var toVlAesthetic = {facetCol: 'column',
-                           facetRow: 'row',
-                           x: 'x',
-                           y: 'y',
-                           color: 'color'
-                          };
-      var toVlType = {'c': 'nominal', 'r': 'quantitative'};
 
       // e.g.,
       // {
@@ -361,6 +389,67 @@ var multi = function(dist) {
         encoding: _.extend({size: {field: '__prob__', type: 'quantitative'}}, encodings)
       }
       return out
+    },
+    density: function(_mappings, _distDf, fieldTypes) {
+      var LP = _mappings;
+      var PL = _.invert(LP);
+
+      // group by cartesian product of all categorical variables
+      var cFields = _.pluck(filter(function(pair) { return pair[1] == 'c' },
+                                   _.pairs(fieldTypes)),
+                            '0');
+
+      var rFields = _.pluck(filter(function(pair) { return pair[1] == 'r' },
+                                   _.pairs(fieldTypes)),
+                            '0'),
+          rField = rFields[0];
+
+
+      var distDfKeyed = map(
+        function(row) { _.extend({__key__: JSON.stringify(_.pick(row, cFields))}, row) },
+        _distDf
+      )
+      var distDfGrouped = _.groupBy(distDfKeyed, '__key__');
+      var densitiesGrouped = mapObject(
+        function(key, group) {
+          var keyParsed = JSON.parse(key);
+          var probs = _.pluck(group, '__prob__');
+          var weight = util.sum(probs);
+          var values = _.pluck(group, rField);
+          var densityEstimates = map(
+            function(x) {
+              var z = _.object([[rField, x.item],["__prob__", x.density * weight]]);
+              return _.extend(z, keyParsed)
+            },
+            webpplViz.stats.kde(values, {weights: probs}));
+          return densityEstimates;
+        },
+        distDfGrouped
+      )
+      var densities = _.flatten(_.values(densitiesGrouped))
+      // e.g.,
+      // {
+      //   x: {field: PL.x, type: toVlType[fieldTypes[PL.x]]},
+      //   y: {field: PL.y, type: toVlType[fieldTypes[PL.y]]}
+      // }
+      var encodings = _.object(map(
+        function(aesthetic) {
+          var field = PL[aesthetic],
+              type = fieldTypes[field],
+              vlType = toVlType[type];
+
+          return [toVlAesthetic[aesthetic], {field: field, type: vlType}]
+        },
+        _.keys(PL)
+      ))
+
+      var out = {
+        regularVega: false,
+        data: {values: densities},
+        mark: "line",
+        encoding: _.extend({y: {field: '__prob__', type: 'quantitative'}}, encodings)
+      }
+      return out
     }
   }
 
@@ -374,7 +463,8 @@ var multi = function(dist) {
     if (typeof viz !== 'undefined' /* browser */) {
       viz.renderSpec(abs.spec, {regularVega: abs.spec.regularVega, smartAxes: false})
     } else {
-      console.log(JSON.stringify(abs.mappings, null, 1))
+      console.log(JSON.stringify(abs.spec, null, 1))
+      process.exit()
     }
   },
       graphDist.support())
@@ -386,9 +476,12 @@ if (typeof window == 'undefined') {
   util.seedRNG(3)
   var posterior = MH(function() {
     return {skill: gaussian(0,1),
-            group: uniformDraw(['a','b'])
+            group: uniformDraw(['a','b']),
+            country: flip(0.9) ? 'CAN' : 'MEX'
            }
   }, 100)
   multi(posterior)
 }
 ''
+
+//webpplViz.stats.kde.toString()

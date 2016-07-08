@@ -12,8 +12,9 @@ var React = require('react');
 var ReactDOM = require('react-dom');
 var md5 = require('md5');
 
-var kde = require('./stats').kde;
-var kde2d = require('./stats').kde2d;
+var stats = require('./stats'),
+    kde = stats.kde,
+    kde2d = stats.kde2d;
 
 function runningInBrowser() {
   return (typeof window === 'object')
@@ -1400,7 +1401,8 @@ var viz = {
   table: table,
   heatMap: heatMap,
   marginals: marginals,
-  renderSpec: renderSpec
+  renderSpec: renderSpec,
+  stats: stats
 }
 
 if (typeof module !== 'undefined' && module.exports) {

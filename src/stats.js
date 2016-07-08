@@ -217,7 +217,12 @@ function kde2d(x,y) {
 
 }
 
-module.exports = {
+var exports = {
   kde: kde,
   kde2d: kde2d
 }
+
+if (typeof viz !== 'undefined') {
+  viz.stats = exports;
+}
+module.exports = exports;
