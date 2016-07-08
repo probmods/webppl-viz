@@ -142,6 +142,7 @@ var multi = function(dist) {
     )
   };
 
+  // samples abstract metadata (mark type, mappings) and a concrete spec
   var sampleGraph = function(distDf) {
     // get types for every column except __prob__
     var fieldTypes = _.omit(getColumnTypes(distDf), '__prob__'),
@@ -410,6 +411,7 @@ var multi = function(dist) {
         _distDf
       )
       var distDfGrouped = _.groupBy(distDfKeyed, '__key__');
+      // TODO: use this more general form in the vanilla density functions (r, cr, ccr, ...)
       var densitiesGrouped = mapObject(
         function(key, group) {
           var keyParsed = JSON.parse(key);
@@ -459,12 +461,12 @@ var multi = function(dist) {
 
   var graphDist = Enumerate(function() { sampleGraph(distDf) });
 
+  // in browser, render all specs. on command line (dev), emit spec text
   map(function(abs) {
     if (typeof viz !== 'undefined' /* browser */) {
       viz.renderSpec(abs.spec, {regularVega: abs.spec.regularVega, smartAxes: false})
     } else {
       console.log(JSON.stringify(abs.spec, null, 1))
-      process.exit()
     }
   },
       graphDist.support())
