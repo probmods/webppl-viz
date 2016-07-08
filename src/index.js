@@ -1389,6 +1389,10 @@ function marginals(erp, options) {
   )
 }
 
+var coarsen = function(xs, numBins) {
+  var scale = d3.scale.quantile().domain(xs).range(d3.range(4));
+  return xs.map(function(x) { return scale(x) + '' })
+}
 
 var viz = {
   d3auto: require('./old').print,
@@ -1402,7 +1406,8 @@ var viz = {
   heatMap: heatMap,
   marginals: marginals,
   renderSpec: renderSpec,
-  stats: stats
+  stats: stats,
+  coarsen: coarsen
 }
 
 if (typeof module !== 'undefined' && module.exports) {

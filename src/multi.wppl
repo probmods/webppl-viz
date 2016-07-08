@@ -17,6 +17,32 @@ var err = function(msg) {
   process.exit()
 }
 
+var getColumnType = function(columnValues) {
+  // for now, support real, integer, and categorical
+  // some questions:
+  // - can we support list of reals a la dirichlet?
+  // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
+  if (_.every(columnValues, _.isNumber)) {
+    return _.every(columnValues, Number.isInteger) ? 'c' : 'r'
+  } else {
+    return 'c'
+  }
+};
+
+var getColumnTypes = function(df) {
+  var columnNames = _.keys(df[0]);
+  return _.object(
+    columnNames,
+    map(function(name) {
+      if (name == '__prob__') {
+        return 'real'
+      } else {
+        return getColumnType(_.pluck(df, name));
+      }
+    }, columnNames)
+  )
+};
+
 var multi = function(dist) {
 
   var mappingSamplers = {
@@ -60,8 +86,11 @@ var multi = function(dist) {
           ((nR == 1)
            ? ((n == 1) ? ['x'] :
               (n == 2) ? ['x', uniformDraw(['color','y'])] :
-              (n == 3) ? ['x', 'color', 'facetCol'] :
-              (n == 4) ? ['x','color','facetCol', 'facetRow'] :
+              // TODO: write helper function
+              (n == 3) ? ['x'].concat(uniformDraw([['color', 'facetCol'], ['color', 'y'], ['facetCol', 'y']])) :
+              (n == 4) ? _.without(['x', 'y', 'color', 'facetCol','facetRow'],
+                                   uniformDraw(['color', 'facetCol','facetRow','y'])) :
+              (n == 5) ? ['x', 'y', 'color', 'facetCol','facetRow'] :
               err("too many fields")) :
            // nR == 2
            ((nR == 2)
@@ -116,32 +145,6 @@ var multi = function(dist) {
     }
   }
 
-  var getColumnType = function(columnValues) {
-    // for now, support real, integer, and categorical
-    // some questions:
-    // - can we support list of reals a la dirichlet?
-    // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
-    if (_.every(columnValues, _.isNumber)) {
-      return _.every(columnValues, Number.isInteger) ? 'c' : 'r'
-    } else {
-      return 'c'
-    }
-  };
-
-  var getColumnTypes = function(df) {
-    var columnNames = _.keys(df[0]);
-    return _.object(
-      columnNames,
-      map(function(name) {
-        if (name == '__prob__') {
-          return 'real'
-        } else {
-          return getColumnType(_.pluck(df, name));
-        }
-      }, columnNames)
-    )
-  };
-
   // samples abstract metadata (mark type, mappings) and a concrete spec
   var sampleGraph = function(distDf) {
     // get types for every column except __prob__
@@ -151,7 +154,7 @@ var multi = function(dist) {
     var nR = filter(function(t) { return t == 'r' }, types).length;
 
     var possibleMarks = [
-      ['freqtable','hist'],  // 0 r
+      [/*'freqtable',*/'hist'],  // 0 r
       ['scatter','density'], // 1 r
       ['scatter','heat'],    // 2 r
       ['parcoords']          // 3 r
@@ -159,11 +162,11 @@ var multi = function(dist) {
 
     var mark = uniformDraw(possibleMarks);
     // condition(mark == 'hist')
-    condition(mark == 'density')
+    //condition(mark == 'scatter')
 
     // sample mappings for this mark
     var mappingSampler = mappingSamplers[mark],
-    mappings = mappingSampler(fieldTypes);
+        mappings = mappingSampler(fieldTypes);
 
     // make vega spec
     var specMaker = specMakers[mark],
@@ -461,12 +464,12 @@ var multi = function(dist) {
 
   var graphDist = Enumerate(function() { sampleGraph(distDf) });
 
-  // in browser, render all specs. on command line (dev), emit spec text
+  // in browser, render all specs. on command line (dev), emit mappings
   map(function(abs) {
     if (typeof viz !== 'undefined' /* browser */) {
       viz.renderSpec(abs.spec, {regularVega: abs.spec.regularVega, smartAxes: false})
     } else {
-      console.log(JSON.stringify(abs.spec, null, 1))
+      console.log(JSON.stringify(abs.mappings, null, 1))
     }
   },
       graphDist.support())
@@ -478,10 +481,17 @@ if (typeof window == 'undefined') {
   util.seedRNG(3)
   var posterior = MH(function() {
     return {skill: gaussian(0,1),
+            //age: beta(0.3, 0.3) + 6,
             group: uniformDraw(['a','b']),
             country: flip(0.9) ? 'CAN' : 'MEX'
            }
   }, 100)
+  // var posterior = MH(function() {
+  //   return {skill: gaussian(0,1),
+  //           group: uniformDraw(['a','b']),
+  //           country: flip(0.9) ? 'CAN' : 'MEX'
+  //          }
+  // }, 100)
   multi(posterior)
 }
 ''
