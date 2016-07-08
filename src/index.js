@@ -748,7 +748,8 @@ var GraphComponent = React.createClass({
 function renderSpec(spec, _options) {
   var options = _.defaults(_options || {},
                            {regularVega: false,
-                            fileName: false
+                            fileName: false,
+                            smartAxes: true
                            })
 
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
@@ -767,89 +768,92 @@ function renderSpec(spec, _options) {
 
   // format axes: try to guess a good number formatter and format
   // axes so they don't overlap
-  var allData = vgSpec.data;
-  _.each(
-    vgSpec.marks,
-    function(mark) {
-      var scales = mark.scales;
-      _.each(
-        mark.axes,
-        function(axis) {
-          var scale = _.findWhere(scales, {name: axis.scale}),
-              scaleDomain = scale.domain;
 
-          var domain;
-          if (_.isArray(scaleDomain)) {
-            domain = scaleDomain;
-          } else {
-            var dataSource = scale.domain.data,
-                dataField = scale.domain.field || 'item';
-            domain = _.pluck(_.findWhere(allData, {name: dataSource}).values, dataField);
-          }
+  if (options.smartAxes) {
+    var allData = vgSpec.data;
+    _.each(
+      vgSpec.marks,
+      function(mark) {
+        var scales = mark.scales;
+        _.each(
+          mark.axes,
+          function(axis) {
+            var scale = _.findWhere(scales, {name: axis.scale}),
+                scaleDomain = scale.domain;
 
-          // get tick values
-          var sc = d3.scale.linear();
-          sc.domain(domain);
-          sc.range([scale.rangeMin, scale.rangeMax]);
-          if (scale.nice) {
-            sc.nice()
-          }
-          var ticks = sc.ticks(axis.ticks);
+            var domain;
+            if (_.isArray(scaleDomain)) {
+              domain = scaleDomain;
+            } else {
+              var dataSource = scale.domain.data,
+              dataField = scale.domain.field || 'item';
+              domain = _.pluck(_.findWhere(allData, {name: dataSource}).values, dataField);
+            }
 
-          // score formatters by the length of the longest string they produce on ticks
-          var scores = _.map(
-            formatterKeys,
-            function(key) {
-              var f = formatters[key];
-              var strings = _.map(ticks, function(tick) { return f(tick) });
-              var stringsAdjusted;
-              // require that formatter produces different strings for different ticks
-              var score;
-              if (_.unique(strings).length < strings.length) {
-                score = 9999999999
-              } else {
-                // don't penalize for commas
-                stringsAdjusted = _.map(strings, function(s) { return s.replace(',','')})
-                var lengths = _.pluck(stringsAdjusted, 'length');
-                score = _.max(lengths)
-              };
-              return {key: key,
-                      score: score + (key == '.1e' ? 1 : 0),
-                      strings: strings,
-                      stringsAdjusted: stringsAdjusted
-                     } // extra penalty for .1e
-            });
+            // get tick values
+            var sc = d3.scale.linear();
+            sc.domain(domain);
+            sc.range([scale.rangeMin, scale.rangeMax]);
+            if (scale.nice) {
+              sc.nice()
+            }
+            var ticks = sc.ticks(axis.ticks);
 
-          // get best formatter
-          var bestScore = _.min(_.pluck(scores, 'score'));
-          var bestKeys = _.pluck(_.where(scores, {score: bestScore}),'key');
+            // score formatters by the length of the longest string they produce on ticks
+            var scores = _.map(
+              formatterKeys,
+              function(key) {
+                var f = formatters[key];
+                var strings = _.map(ticks, function(tick) { return f(tick) });
+                var stringsAdjusted;
+                // require that formatter produces different strings for different ticks
+                var score;
+                if (_.unique(strings).length < strings.length) {
+                  score = 9999999999
+                } else {
+                  // don't penalize for commas
+                  stringsAdjusted = _.map(strings, function(s) { return s.replace(',','')})
+                  var lengths = _.pluck(stringsAdjusted, 'length');
+                  score = _.max(lengths)
+                };
+                return {key: key,
+                        score: score + (key == '.1e' ? 1 : 0),
+                        strings: strings,
+                        stringsAdjusted: stringsAdjusted
+                       } // extra penalty for .1e
+              });
 
-          // break ties: prefer, in this order:
-          // ,r > ,g >  ,.Xr > ,.Xg > ,.1e
+            // get best formatter
+            var bestScore = _.min(_.pluck(scores, 'score'));
+            var bestKeys = _.pluck(_.where(scores, {score: bestScore}),'key');
 
-          var bestKey = _.find(bestKeys, function(key) { return key == ',r' }) ||
-              _.find(bestKeys, function(key) { return key == ',g' }) ||
-              _.find(bestKeys, function(key) { return key.indexOf('g') > -1 }) ||
-              _.find(bestKeys, function(key) { return key.indexOf('r') > -1 }) ||
-              bestKeys[0];
+            // break ties: prefer, in this order:
+            // ,r > ,g >  ,.Xr > ,.Xg > ,.1e
 
-          axis.format = bestKey;
+            var bestKey = _.find(bestKeys, function(key) { return key == ',r' }) ||
+                _.find(bestKeys, function(key) { return key == ',g' }) ||
+                _.find(bestKeys, function(key) { return key.indexOf('g') > -1 }) ||
+                _.find(bestKeys, function(key) { return key.indexOf('r') > -1 }) ||
+                bestKeys[0];
 
-          if (axis.type == 'x') {
-            axis.properties = {
-              labels: {
-                // TODO: the actual strings that show up in the picture can differ
-                // from what we compute here, so i'm just using a large constant angle
-                // as a temporary hack
-                angle: {"value": bestScore < 4 ? 0 : 30},
-                align: {"value": 'left'}
+            axis.format = bestKey;
+
+            if (axis.type == 'x') {
+              axis.properties = {
+                labels: {
+                  // TODO: the actual strings that show up in the picture can differ
+                  // from what we compute here, so i'm just using a large constant angle
+                  // as a temporary hack
+                  angle: {"value": bestScore < 4 ? 0 : 30},
+                  align: {"value": 'left'}
+                }
               }
             }
           }
-        }
-      )
-    }
-  )
+        )
+          }
+    )
+      }
 
   var resultContainer;
 
@@ -1395,7 +1399,8 @@ var viz = {
   line: lineWrapper,
   table: table,
   heatMap: heatMap,
-  marginals: marginals
+  marginals: marginals,
+  renderSpec: renderSpec
 }
 
 if (typeof module !== 'undefined' && module.exports) {

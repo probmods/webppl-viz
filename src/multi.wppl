@@ -2,251 +2,253 @@
   (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; webppl src/multi.wppl\n")))
 */
 
-var mappingSamplers = {
-  freqtable: function(fieldTypes) {
-    // assumes 0 r
-    var n = _.size(fieldTypes), fields = _.keys(fieldTypes), types = _.pluck(fieldTypes, 'type');
+var multi = function(dist) {
 
-    // TODO: sample a permutation of fields
+  var mappingSamplers = {
+    freqtable: function(fieldTypes) {
+      // assumes 0 r
+      var n = _.size(fieldTypes), fields = _.keys(fieldTypes), types = _.pluck(fieldTypes, 'type');
 
-    var d = {
-      '1': ['col'],
-      '2': ['col','row'],
-      '3': ['col','row','facetCol'],
-      '4': ['col','row','facetCol','facetRow']
-    }
+      // TODO: sample a permutation of fields
 
-    return _.object(fields, d[n + '']);
-  },
-  hist: function(fieldTypes) {
-    var n = _.size(fieldTypes), fields = _.keys(fieldTypes), types = _.pluck(fieldTypes, 'type');
-
-    if (n == 1) {
-      // TODO: possibly use color?
-      return _.object(fields, ['x'])
-    } else if (n == 2) {
-      return _.object(fields, ['x', uniformDraw(['color','facetCol'])])
-    } else if (n == 3) {
-      return _.object(fields, ['x', 'color', 'facetCol']);
-    } else if (n == 4) {
-      return _.object(fields, ['x','color','facetCol', 'facetRow']);
-    } else {
-      console.log("too many fields");
-      return process.exit();
-    }
-  },
-  scatter: function(fieldTypes) {
-    // TODO: do something different for 1r versus 2r
-  }
-}
-
-var getColumnType = function(columnValues) {
-  // for now, support real, integer, and categorical
-  // some questions:
-  // - can we support list of reals a la dirichlet?
-  // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
-  if (_.every(columnValues, _.isNumber)) {
-    return _.every(columnValues, Number.isInteger) ? 'c' : 'r'
-  } else {
-    return 'c'
-  }
-};
-
-var getColumnTypes = function(df) {
-  var columnNames = _.keys(df[0]);
-  return _.object(
-    columnNames,
-    map(function(name) {
-      if (name == '__prob__') {
-        return 'real'
-      } else {
-        return getColumnType(_.pluck(df, name));
+      var d = {
+        '1': ['col'],
+        '2': ['col','row'],
+        '3': ['col','row','facetCol'],
+        '4': ['col','row','facetCol','facetRow']
       }
-    }, columnNames)
-  )
-};
 
-var sampleGraph = function(distDf) {
-  // get types for every column except __prob__
-  var fieldTypes = _.omit(getColumnTypes(distDf), '__prob__'),
-      types = _.values(fieldTypes);
+      return _.object(fields, d[n + '']);
+    },
+    hist: function(fieldTypes) {
+      var n = _.size(fieldTypes), fields = _.keys(fieldTypes), types = _.pluck(fieldTypes, 'type');
 
-  var nR = filter(function(t) { return t == 'r' }, types).length;
+      if (n == 1) {
+        // TODO: possibly use color?
+        return _.object(fields, ['x'])
+      } else if (n == 2) {
+        return _.object(fields, ['x', uniformDraw(['color','facetCol'])])
+      } else if (n == 3) {
+        return _.object(fields, ['x', 'color', 'facetCol']);
+      } else if (n == 4) {
+        return _.object(fields, ['x','color','facetCol', 'facetRow']);
+      } else {
+        console.log("too many fields");
+        return process.exit();
+      }
+    },
+    scatter: function(fieldTypes) {
+      // TODO: do something different for 1r versus 2r
+    }
+  }
 
-  var possibleMarks = [
-    ['freqtable','hist'],  // 0 r
-    ['scatter','density'], // 1 r
-    ['scatter','heat'],    // 2 r
-    ['parcoords']          // 3 r
-  ][nR > 3 ? 3 : nR];
+  var getColumnType = function(columnValues) {
+    // for now, support real, integer, and categorical
+    // some questions:
+    // - can we support list of reals a la dirichlet?
+    // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
+    if (_.every(columnValues, _.isNumber)) {
+      return _.every(columnValues, Number.isInteger) ? 'c' : 'r'
+    } else {
+      return 'c'
+    }
+  };
 
-  var mark = uniformDraw(possibleMarks);
-  condition(mark == 'hist')
+  var getColumnTypes = function(df) {
+    var columnNames = _.keys(df[0]);
+    return _.object(
+      columnNames,
+      map(function(name) {
+        if (name == '__prob__') {
+          return 'real'
+        } else {
+          return getColumnType(_.pluck(df, name));
+        }
+      }, columnNames)
+    )
+  };
 
-  // sample mappings for this mark
-  var mappingSampler = mappingSamplers[mark],
-      mappings = mappingSampler(fieldTypes);
+  var sampleGraph = function(distDf) {
+    // get types for every column except __prob__
+    var fieldTypes = _.omit(getColumnTypes(distDf), '__prob__'),
+    types = _.values(fieldTypes);
 
-  // make vega spec
-  var specMaker = specMakers[mark],
-      spec = specMaker(mappings, distDf);
+    var nR = filter(function(t) { return t == 'r' }, types).length;
 
-  /* conditions:
-     - prefer colors over facet cols
-     - prefer facet cols over facet rows
-     - prefer fewer colors
-  */
+    var possibleMarks = [
+      ['freqtable','hist'],  // 0 r
+      ['scatter','density'], // 1 r
+      ['scatter','heat'],    // 2 r
+      ['parcoords']          // 3 r
+    ][nR > 3 ? 3 : nR];
 
-  var out = {mark: mark,
-             mappings: mappings,
-             spec: spec};
-  return out;
-};
+    var mark = uniformDraw(possibleMarks);
+    condition(mark == 'hist')
 
-var specMakers = {
-  hist: function(_mappings /* logical -> physical */, _distDf) {
-    var k = _.size(_mappings);
-    var _mappingsI = _.invert(_mappings);
+    // sample mappings for this mark
+    var mappingSampler = mappingSamplers[mark],
+    mappings = mappingSampler(fieldTypes);
 
-    var presentAesthetics = _.keys(_mappingsI),
-        missingAesthetics = _.difference(['x','facetRow','facetCol','color'], presentAesthetics);
+    // make vega spec
+    var specMaker = specMakers[mark],
+    spec = specMaker(mappings, distDf);
 
-    // add dummy columns (facetRow, facetCol, or color) to mappings dictionaries
+    /* conditions:
+       - prefer colors over facet cols
+       - prefer facet cols over facet rows
+       - prefer fewer colors
+    */
 
-    var facetLogicalNames = {facetRow: 'gy', facetCol: 'gx', color: 'gc'};
+    var out = {mark: mark,
+               mappings: mappings,
+               spec: spec};
+    return out;
+  };
 
-    // logical to physical
-    var LP = _.extend(_.object(map(function(name) { return [facetLogicalNames[name], name]  },
-                                missingAesthetics)),
-                      _mappings);
-    // physical to logical
-    var PL = _.invert(LP);
+  var specMakers = {
+    hist: function(_mappings, _distDf) {
+      var k = _.size(_mappings);
+      var _mappingsI = _.invert(_mappings);
 
-    // add dummy columns to data
-    var distDf = missingAesthetics.length == 0
+      var presentAesthetics = _.keys(_mappingsI),
+          missingAesthetics = _.difference(['x','facetRow','facetCol','color'], presentAesthetics);
+
+      // add dummy columns (facetRow, facetCol, or color) to mappings dictionaries
+
+      // TODO: when we have dummy facets, why do logical field names and scale names need to be the same (e.g. "gx")
+      // for the padding to be correct?
+      var facetLogicalNames = {facetRow: 'gy', facetCol: 'gx', color: 'gc'};
+
+      // logical to physical
+      var LP = _.extend(_.object(map(function(name) { return [facetLogicalNames[name], name]  },
+                                     missingAesthetics)),
+                        _mappings);
+      // physical to logical
+      var PL = _.invert(LP);
+
+      // add dummy columns to data
+      var distDf = missingAesthetics.length == 0
         ? _distDf
         : map(function(row) {
           var dummyCols = _.object(map(function(name) { return [facetLogicalNames[name], 'dummy']  }, missingAesthetics))
           _.extend(dummyCols, row) },
               _distDf);
 
-    // start building spec from the bottom up
+      // start building spec from the bottom up
 
-    var xSource = PL.x;
-    var colorSource = PL.color;
+      var xSource = PL.x;
+      var colorSource = PL.color;
 
-    var marks2 = [
-      {name: 'marks2',
-       type: 'rect',
-       properties: {
-         update: {
-           x:      {scale: 'colorPosScale', field: colorSource},
-           width:  {scale: 'colorPosScale', band: true, offset: 0},
-           y:      {scale: 'probScale', field: '__prob__'},
-           y2:     {scale: 'probScale', value: 0},
-           fill:   {scale: 'colorColorScale', field: colorSource},
-           opacity: {value: 0.7}
+      var marks2 = [
+        {name: 'marks2',
+         type: 'rect',
+         properties: {
+           update: {
+             x:      {scale: 'colorPosScale', field: colorSource},
+             width:  {scale: 'colorPosScale', band: true, offset: 0},
+             y:      {scale: 'probScale', field: '__prob__'},
+             y2:     {scale: 'probScale', value: 0},
+             fill:   {scale: 'colorColorScale', field: colorSource},
+             opacity: {value: 0.7}
+           }
          }
-       }
-      }
-    ];
+        }
+      ];
 
-    var marks1 = [
-      {name: 'marks1',
-       type: 'group',
-       from: {
-         transform: [{type: "facet",groupby: xSource}]
-       },
-       properties: {
-         enter: {
-           x: {scale: "xScale",field: "key"},
-           width: {scale: "xScale",band: true}
-         }
-       },
-       scales: [{
-         "name": "colorPosScale",
-         "type": "ordinal",
-         "domain": {"field": colorSource},
-         "range": "width"
-       }],
-       marks: marks2
-      }
-    ];
-
-    var marks0 = [
-      {name: 'marks0',
-       type: 'group',
-       properties: {
-         update: {
-           x: {scale: "gx",field: PL.facetCol},
-           y: {scale: "gy",field: PL.facetRow},
-           width: {scale: "gx", band: true, offset: 0},
-           height: {scale: "gy", band: true, offset: 0},
-           stroke: {value: "#ccc"},
-           strokeWidth: {value: 1}
-         }
-       },
-       from: {
-         data: "raw",
-         transform: [{type: "facet",groupby: [PL.facetRow, PL.facetCol]}]
-       },
-       scales: [
-         {
-           name: "xScale",
-           type: "ordinal",
-           domain: {field: xSource},
-           range: "width",
-           padding: 0.2
+      var marks1 = [
+        {name: 'marks1',
+         type: 'group',
+         from: {
+           transform: [{type: "facet",groupby: xSource}]
          },
-         {
-           name: "probScale",
-           type: "linear",
-           domain: {data: 'raw', field: "__prob__"}, // TODO: make a random choice between data domain and [0,1]?
-           range: "height"
+         properties: {
+           enter: {
+             x: {scale: "xScale",field: "key"},
+             width: {scale: "xScale",band: true}
+           }
          },
-         {
-           name: "colorColorScale",
-           type: "ordinal",
-           domain: {field: colorSource},
-           range: "category10"
-         }
-       ],
-       axes: [
-         {type: "y", scale: "probScale", title: "Probability"},
-         {type: "x", scale: "xScale", title: xSource}
-       ],
-       marks: marks1
-      }
-    ];
+         scales: [{
+           "name": "colorPosScale",
+           "type": "ordinal",
+           "domain": {"field": colorSource},
+           "range": "width"
+         }],
+         marks: marks2
+        }
+      ];
 
-    var facetScales = [
-      {
-        name: 'gx',
-        type: 'ordinal',
-        domain: {data: 'raw', field: PL.facetCol},
-        range: 'width',
-        padding: 0.1
-      },
-      {
-        name: 'gy',
-        type: 'ordinal',
-        domain: {data: 'raw', field: PL.facetRow},
-        range: 'height',
-        padding: 0.1
-      }
-    ];
+      var marks0 = [
+        {name: 'marks0',
+         type: 'group',
+         properties: {
+           update: {
+             x: {scale: "gx",field: PL.facetCol},
+             y: {scale: "gy",field: PL.facetRow},
+             width: {scale: "gx", band: true, offset: 0},
+             height: {scale: "gy", band: true, offset: 0},
+             stroke: {value: "#ccc"},
+             strokeWidth: {value: 1}
+           }
+         },
+         from: {
+           data: "raw",
+           transform: [{type: "facet",groupby: [PL.facetRow, PL.facetCol]}]
+         },
+         scales: [
+           {
+             name: "xScale",
+             type: "ordinal",
+             domain: {field: xSource},
+             range: "width",
+             padding: 0.2
+           },
+           {
+             name: "probScale",
+             type: "linear",
+             domain: {data: 'raw', field: "__prob__"}, // TODO: make a random choice between data domain and [0,1]?
+             range: "height"
+           },
+           {
+             name: "colorColorScale",
+             type: "ordinal",
+             domain: {field: colorSource},
+             range: "category10"
+           }
+         ],
+         axes: [
+           {type: "y", scale: "probScale", title: "Probability"},
+           {type: "x", scale: "xScale", title: xSource}
+         ],
+         marks: marks1
+        }
+      ];
 
-    // TODO: hide facet Axes for dummy values
-    var facetAxes = [
-      {
+      var facetScales = [
+        {
+          name: 'gx',
+          type: 'ordinal',
+          domain: {data: 'raw', field: PL.facetCol},
+          range: 'width',
+          padding: 0.1
+        },
+        {
+          name: 'gy',
+          type: 'ordinal',
+          domain: {data: 'raw', field: PL.facetRow},
+          range: 'height',
+          padding: 0.1
+        }
+      ];
+
+      var gyAxis = {
         type: "y",
         scale: "gy",
         orient: "left",
         tickSize: 0,
         title: PL.facetRow,
         properties: {axis: {strokeWidth: {value: 1}}}
-      },
-      {
+      };
+      var gxAxis = {
         type: "x",
         scale: "gx",
         tickSize: 0,
@@ -255,42 +257,44 @@ var specMakers = {
           axis: {strokeWidth: {value: 1}},
           title: {angle: 0}
         }
-      }
-    ];
+      };
 
-    var viz = {
-      data: [{"name": "raw", "values": distDf}],
-      scales: facetScales,
-      axes: facetAxes,
-      marks: marks0
-    };
+      // TODO: hide facet Axes for dummy values
+      var facetAxes =
+          (_.contains(missingAesthetics, 'facetRow') ? [] : [gyAxis]).concat(
+            _.contains(missingAesthetics, 'facetCol') ? [] : [gxAxis]
+          );
 
-    return viz;
+      var viz = {
+        width: 250,
+        height: 250,
+        data: [{"name": "raw", "values": distDf}],
+        scales: facetScales,
+        axes: facetAxes,
+        marks: marks0
+      };
+
+      return viz;
+    }
   }
-}
 
-
-
-var multi = function(dist) {
   // convert distribution to a dataframe including a __prob__  column
   var distDf = map(function(x) { _.extend({__prob__: Math.exp(dist.score(x))}, x)},
                    dist.support())
 
-  // sample an abstract graph based on the data
-  var graphDist = Rejection(function() {  sampleGraph(distDf) } );
+  var graphDist = Enumerate(function() { sampleGraph(distDf) });
 
-  // convert the abstract graph into a full vega spec
-  var spec = graphDist.support()[0].spec;
-  return spec;
+  map(function(abs) { viz.renderSpec(abs.spec, {regularVega: true, smartAxes: false}) },
+      graphDist.support())
+
+  return ""
 }
 
-util.seedRNG(3)
-
-var posterior = Enumerate(function() {
-  var boolA = flip(0.6);
-  return {alpha: boolA ? 'foo' : 'bar',
-          beta: flip(boolA ? 0.9 : 0.7) ? 'baz' : 'quux'
-         }
-})
-
-JSON.stringify(multi(posterior),null,1)
+// util.seedRNG(3)
+// var posterior = Enumerate(function() {
+//   var boolA = flip(0.6);
+//   return {alpha: boolA ? 'foo' : 'bar',
+//           beta: flip(boolA ? 0.9 : 0.7) ? 'baz' : 'quux'
+//          }
+// })
+// JSON.stringify(multi(posterior),null,1)

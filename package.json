@@ -61,5 +61,8 @@
     "watchify": "^3.7.0",
     "webppl": "probmods/webppl#8941a5",
     "webppl-editor": "probmods/webppl-editor#b69f4f4"
+  },
+  "webppl": {
+    "wppl": ["src/multi.wppl"]
   }
 }
