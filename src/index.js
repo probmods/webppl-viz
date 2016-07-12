@@ -1414,6 +1414,8 @@ if (typeof module !== 'undefined' && module.exports) {
   exports = module.exports = viz;
 }
 
-if (typeof window === 'object') {
-  window.viz = viz;
-}
+// if (typeof window === 'object') {
+//   window.viz = viz;
+// }
+
+global.viz = viz;
