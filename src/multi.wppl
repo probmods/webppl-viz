@@ -477,23 +477,23 @@ var multi = function(dist) {
   return ""
 }
 
-if (typeof window == 'undefined') {
-  util.seedRNG(3)
-  var posterior = MH(function() {
-    return {skill: gaussian(0,1),
-            //age: beta(0.3, 0.3) + 6,
-            group: uniformDraw(['a','b']),
-            country: flip(0.9) ? 'CAN' : 'MEX'
-           }
-  }, 100)
-  // var posterior = MH(function() {
-  //   return {skill: gaussian(0,1),
-  //           group: uniformDraw(['a','b']),
-  //           country: flip(0.9) ? 'CAN' : 'MEX'
-  //          }
-  // }, 100)
-  multi(posterior)
-}
-''
+// if (typeof window == 'undefined') {
+//   util.seedRNG(3)
+//   var posterior = MH(function() {
+//     return {skill: gaussian(0,1),
+//             //age: beta(0.3, 0.3) + 6,
+//             group: uniformDraw(['a','b']),
+//             country: flip(0.9) ? 'CAN' : 'MEX'
+//            }
+//   }, 100)
+//   // var posterior = MH(function() {
+//   //   return {skill: gaussian(0,1),
+//   //           group: uniformDraw(['a','b']),
+//   //           country: flip(0.9) ? 'CAN' : 'MEX'
+//   //          }
+//   // }, 100)
+//   multi(posterior)
+// }
+// ''
 
 //webpplViz.stats.kde.toString()
