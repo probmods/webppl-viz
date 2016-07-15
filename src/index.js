@@ -790,7 +790,7 @@ function renderSpec(spec, _options) {
               domain = scaleDomain;
             } else {
               var dataSource = scale.domain.data,
-              dataField = scale.domain.field || 'item';
+                  dataField = scale.domain.field || 'item';
               domain = _.pluck(_.findWhere(allData, {name: dataSource}).values, dataField);
             }
 
@@ -841,18 +841,6 @@ function renderSpec(spec, _options) {
                 bestKeys[0];
 
             axis.format = bestKey;
-
-            if (axis.type == 'x') {
-              axis.properties = {
-                labels: {
-                  // TODO: the actual strings that show up in the picture can differ
-                  // from what we compute here, so i'm just using a large constant angle
-                  // as a temporary hack
-                  angle: {"value": bestScore < 4 ? 0 : 30},
-                  align: {"value": 'left'}
-                }
-              }
-            }
           }
         )
           }
@@ -1027,6 +1015,8 @@ function hist(obj, options) {
     support = rawSupport;
   }
 
+  var xValues, xTickLabels, yValues;
+
   if (_.every(support, _.isNumber)) {
 
     var min = _.min(support), max = _.max(support),
@@ -1035,8 +1025,8 @@ function hist(obj, options) {
     var binIndices = d3.range(options.numBins),
         bins = binIndices.map(function() { return [] }),
         binProbs = binIndices.map(function() { return 0 }),
-        binLabels = binIndices.map(function(i) {
-          return (min + (i + 0.5) * binWidth).toExponential(2)
+        binMeans = binIndices.map(function(i) {
+          return (min + (i + 0.5) * binWidth)
         });
 
     // place values into the appropriate bins
@@ -1047,14 +1037,51 @@ function hist(obj, options) {
       bins[j].push(x);
       binProbs[j] += probs[i];
     }
-    barWrapper(binLabels, binProbs, {xLabel: options.xLabel || 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
-    return;
+
+    xTickLabels = binIndices.reduce(function(acc, x, i) {
+      var extent = scale.invertExtent(x);
+      return acc.concat(i == 0 ? extent : extent[1])
+    }, []);
+    xValues = binMeans;
+    yValues = binProbs;
+  } else {
+    xValues = support.map(stringifyIfObject);
+    yValues = probs;
   }
 
+  var df = xValues.map(function(x,i) {
+    var y = yValues[i]
+    return _.object([['x', x],['y',y]])
+  })
 
-  var supportStringified = support.map(stringifyIfObject)
+  var vlSpec = {
+    data: {values: df},
+    mark: "bar",
+    encoding: {
+      x: {field: 'x',
+          type: options.xType,
+          axis: {title: options.xLabel,
+                 values: xTickLabels || xValues
+                },
+          scale: {zero: false,
+                  domain: [min, max]
+                 }},
+      y: {field: 'y',
+          type: "quantitative",
+          axis: {title: 'Probability'},
+          // TODO: get false working
+          scale: {zero: true}
+         },
+      // TODO: this is a heuristic hack to make the bars thinner
+      // if there are more bins
+      size: {value: 120 / options.numBins }
+    }
+  };
 
-  barWrapper(supportStringified, probs, _.extend({xLabel: 'Value', yLabel: 'Probability'}, options))
+  renderSpec(vlSpec, {smartNumbers: true})
+
+
+  // barWrapper(supportStringified, probs, _.extend({xLabel: 'Value', yLabel: 'Probability'}, options))
 
 };
 
