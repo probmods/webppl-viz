@@ -1,4 +1,13 @@
 /*
+  compiling webppl with this package:
+
+  inside webppl:
+
+  grunt browserify:../wp/viz
+
+*/
+
+/*
   (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; webppl src/multi.wppl --require .\n")))
 */
 
