@@ -2,11 +2,11 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <script src="webppl-editor.js"></script>
+    <script src="http://s3-us-west-2.amazonaws.com/cdn.webppl.org/webppl-editor-0.9.2.js"></script>
     <script src="webppl-viz.js"></script>
     <script src="jquery.js"></script>
     <link rel="stylesheet" href="webppl-viz.css">
-    <link rel="stylesheet" href="webppl-editor.css">
+    <link rel="stylesheet" href="http://s3-us-west-2.amazonaws.com/cdn.webppl.org/webppl-editor-0.9.2.css">
 
     <style>
      pre {
@@ -155,9 +155,20 @@ viz.marginals(MH(function() {
   return {x: x, y: y, z: z};
 },500))</code></pre>
 
-    smart axis number formatting:
-    <pre><code>
+    </div>
+    <div class="col">
+
+      <h3>user friendliness</h3>
+      tick label rotation:
+      <pre><code>
+var dist = Enumerate(function() {uniformDraw(['alphabet','city','soup']) })
+viz.auto(dist)
+      </code></pre>
+
+      smart axis number formatting:
+      <pre><code>
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 0.00000001}; },500))
+///fold:
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 0.0000001}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 0.000001}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 0.00001}; },500))
@@ -174,9 +185,9 @@ viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 100000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 1000000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 10000000}; },500))
 viz.auto(ParticleFilter(function() { return {x: beta(3,2) * 100000000}; },500))
-    </code></pre>
-    </div>
-    <div class="col">
+///
+      </code></pre>
+
       <h3>regression testing</h3>
 
       silverman's rule can fail:
