@@ -20,7 +20,7 @@ function runningInBrowser() {
   return (typeof window === 'object')
 }
 
-function isErp(x) {
+function isDist(x) {
   // TODO: take from dippl
   return x.support && x.score;
 }
@@ -567,7 +567,7 @@ function auto(obj, options) {
     )
   };
 
-  if (!isErp(obj)) {
+  if (!isDist(obj)) {
     // TODO: write wpEditor.warn method, use it to inform user that auto only works on ERPs
     // (though maybe this isn't necessary since we are using __print__ decorator in wp-editor?)
     // maybe warn and fall back to print
@@ -987,7 +987,7 @@ function hist(obj, options) {
   var erp;
   if (_.isArray(obj)) {
     erp = samplesToErp(obj)
-  } else if (isErp(obj)) {
+  } else if (isDist(obj)) {
     erp = obj;
   } else {
     throw new Error('hist takes an ERP or a list of samples as an argument')
@@ -1087,7 +1087,7 @@ function scatterWrapper() {
 function heatMap(arg, options) {
   var samples = [];
 
-  if (!isErp(arg)) {
+  if (!isDist(arg)) {
     samples = arg;
   } else {
     var n = options.n;
@@ -1229,7 +1229,7 @@ function density(x, options) {
     return _.isNumber(z) ? z : _.values(z)[0];
   }
 
-  var xIsErp = isErp(x);
+  var xIsErp = isDist(x);
   var support = xIsErp ? _.map(x.support(), extractNumber) : x,
       weights = xIsErp ? _.map(getScores(x), Math.exp) : false;
 
@@ -1328,7 +1328,7 @@ function table(obj, options) {
   var erp;
   if (_.isArray(obj)) {
     erp = samplesToErp(obj)
-  } else if (isErp(obj)) {
+  } else if (isDist(obj)) {
     erp = obj;
   } else {
     throw new Error('table takes an ERP or a list of samples as an argument')
