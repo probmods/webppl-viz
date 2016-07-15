@@ -750,7 +750,7 @@ function renderSpec(spec, _options) {
   var options = _.defaults(_options || {},
                            {regularVega: false,
                             fileName: false,
-                            smartAxes: true,
+                            smartNumbers: true,
                             smartTickLabels: true
                            })
 
@@ -764,7 +764,7 @@ function renderSpec(spec, _options) {
 
 
 
-  if (options.smartAxes) {
+  if (options.smartNumbers) {
     var formatterKeys = [',r',
                          //',g',
                          ',.1r',',.2r',',.3r',',.4r',',.5r',',.6r',
