@@ -750,7 +750,8 @@ function renderSpec(spec, _options) {
   var options = _.defaults(_options || {},
                            {regularVega: false,
                             fileName: false,
-                            smartAxes: true
+                            smartAxes: true,
+                            smartTickLabels: true
                            })
 
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
@@ -857,6 +858,13 @@ function renderSpec(spec, _options) {
           }
     )
       }
+
+  // format tick labels: try to guess a good rotation
+
+  if (options.smartTickLabels) {
+    var marks = vgSpec.marks;
+    //var vgSpec.marks
+  }
 
   var resultContainer;
 
