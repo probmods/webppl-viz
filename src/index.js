@@ -935,11 +935,14 @@ function bar(df, options) {
   // TODO: assert that groupBy variable is actually in the df
 
   var vlSpec = {
-    "data": {values: df},
-    "mark": "bar",
-    "encoding": {
-      "x": {"field": xName, "type": options.xType, axis: {title: options.xLabel || xName}},
-      "y": {"field": yName, "type": "quantitative", axis: {title: options.yLabel || yName}}
+    data: {values: df},
+    mark: "bar",
+    encoding: {
+      x: {field: xName,
+          type: options.xType,
+          axis: {title: options.xLabel || xName},
+          scale: {zero: false}},
+      y: {field: yName, type: "quantitative", axis: {title: options.yLabel || yName}}
     }
   };
 
