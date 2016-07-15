@@ -54,8 +54,9 @@ Basic methods for visualizing samples and marginal distributions. These plot dat
 
 #### Table
 
-- `viz.table(erp, [options])`
-- `viz.table(samples, [options])`
+`viz.table(dist, [options])`
+
+`viz.table(samples, [options])`
 
 *Options*:
 
@@ -65,8 +66,9 @@ Basic methods for visualizing samples and marginal distributions. These plot dat
 
 #### Histogram
 
-- `viz.hist(samples, [options])`
-- `viz.hist(erp, [options])`
+`viz.hist(samples, [options])`
+
+`viz.hist(dist, [options])`
 
 *Options*:
 
@@ -74,8 +76,9 @@ Basic methods for visualizing samples and marginal distributions. These plot dat
 
 #### Density plot
 
-- `viz.density(samples, [options])`
-- `viz.density(erp, [options])`
+`viz.density(samples, [options])`
+
+`viz.density(dist, [options])`
 
 *Options*:
 
@@ -83,13 +86,16 @@ Basic methods for visualizing samples and marginal distributions. These plot dat
 
 #### Heat map
 
-- `viz.heatMap(samples, [options])`
-- `viz.heatMap(erp, [options])`
+`viz.heatMap(samples, [options])`
+
+`viz.heatMap(dist, [options])`
 
 *Options*:
 
 - `bandwidthX` (TODO)
 - `bandwidthY` (TODO)
+- `boundsX` (TODO)
+- `boundsY` (TODO)
 
 #### Parallel coordinates
 
