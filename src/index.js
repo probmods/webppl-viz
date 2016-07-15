@@ -940,9 +940,15 @@ function bar(df, options) {
     encoding: {
       x: {field: xName,
           type: options.xType,
-          axis: {title: options.xLabel || xName},
+          axis: {title: options.xLabel || xName
+                },
           scale: {zero: false}},
-      y: {field: yName, type: "quantitative", axis: {title: options.yLabel || yName}}
+      y: {field: yName,
+          type: "quantitative",
+          axis: {title: options.yLabel || yName}
+          // TODO: enable this once i write a custom spec for hist
+          //scale: {zero: false}
+         }
     }
   };
 
@@ -993,6 +999,9 @@ function barWrapper() {
 }
 
 // currently hist operates on a collection of samples as well (e.g., from repeat)
+// TODO: emit hist-specific vega-lite spec rather than relying on bar
+// - use zero:true for y but zero:false for x
+// - create custom ticks so that bars sit in between ticks
 function hist(obj, options) {
   options = _.defaults(options || {},
                        {numBins: 30})
@@ -1006,41 +1015,42 @@ function hist(obj, options) {
     throw new Error('hist takes an ERP or a list of samples as an argument')
   }
 
-  var support = erp.support();
-  var probs = support.map(function(x) { return Math.exp(scorer(erp, x)) });
-  if (typeof support[0] == 'number') {
-    var min = _.min(support),
-        max = _.max(support),
+  var rawSupport = erp.support(),
+      probs = rawSupport.map(function(x) { return Math.exp(scorer(erp, x)) }),
+      support;
+
+  if (isDataFrame(rawSupport)) {
+    var key = _.keys(rawSupport[0])[0];
+    options.xLabel = options.xLabel || key;
+    support = _.pluck(rawSupport, key);
+  } else {
+    support = rawSupport;
+  }
+
+  if (_.every(support, _.isNumber)) {
+
+    var min = _.min(support), max = _.max(support),
         binWidth = (max-min)/options.numBins;
 
-    // TODO: move into stats.js, maybe rely on d3 methods
-    // OPTIMIZE
-    var bins = [];
-    for(var i = 0; i < options.numBins; i++) {
-      var currentBin = {
-        lower: min + i * binWidth,
-        upper: min + (i + 1) * binWidth
-      };
-      currentBin.entries = _.filter(support, function(x) { return x >= currentBin.lower && x < currentBin.upper })
-      bins.push(currentBin)
+    var binIndices = d3.range(options.numBins),
+        bins = binIndices.map(function() { return [] }),
+        binProbs = binIndices.map(function() { return 0 }),
+        binLabels = binIndices.map(function(i) {
+          return (min + (i + 0.5) * binWidth).toExponential(2)
+        });
+
+    // place values into the appropriate bins
+    var scale = d3.scale.quantile().domain(support).range(binIndices);
+    for(var i = 0, ii = support.length; i < ii; i++) {
+      var x = support[i];
+      var j = scale(x);
+      bins[j].push(x);
+      binProbs[j] += probs[i];
     }
-
-    // make sure max point gets into histogram
-    bins[bins.length-1].upper += Number.EPSILON;
-
-    var binProbs = bins.map(function(bin) {
-      return util.sum(_.map(bin.entries, function(x) { return Math.exp(scorer(erp, x)) }));
-    })
-
-    // TODO: do ticks based on bin boundaries, rather than showing bin means, as i've done here
-    var binLabels = _.map(bins, function(bin) {
-      return ((bin.upper + bin.lower)/2).toExponential(2)
-    })
-
-    barWrapper(binLabels, binProbs, {xLabel: 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
-
+    barWrapper(binLabels, binProbs, {xLabel: options.xLabel || 'Bin mean', yLabel: 'Probability', xType: 'quantitative'})
     return;
   }
+
 
   var supportStringified = support.map(stringifyIfObject)
 
