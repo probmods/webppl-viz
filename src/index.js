@@ -758,19 +758,21 @@ function renderSpec(spec, _options) {
 
   var vgSpec = options.regularVega ? spec : vl.compile(spec).spec;
 
-  var formatterKeys = [',r',
-                       //',g',
-                       ',.1r',',.2r',',.3r',',.4r',',.5r',',.6r',
-                       //',.1g',',.2g',',.3g',',.4g',',.5g',',.6g',
-                       '.1e'];
-  var formatters  = _.object(formatterKeys,
-                             _.map(formatterKeys,
-                                   function(s) { return d3.format(s) }));
-
   // format axes: try to guess a good number formatter and format
   // axes so they don't overlap
 
+
+
   if (options.smartAxes) {
+    var formatterKeys = [',r',
+                         //',g',
+                         ',.1r',',.2r',',.3r',',.4r',',.5r',',.6r',
+                         //',.1g',',.2g',',.3g',',.4g',',.5g',',.6g',
+                         '.1e'];
+    var formatters  = _.object(formatterKeys,
+                               _.map(formatterKeys,
+                                     function(s) { return d3.format(s) }));
+
     var allData = vgSpec.data;
     _.each(
       vgSpec.marks,
