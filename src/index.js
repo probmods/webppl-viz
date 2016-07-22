@@ -1030,7 +1030,7 @@ function hist(obj, options) {
         });
 
     // place values into the appropriate bins
-    var scale = d3.scale.quantile().domain(support).range(binIndices);
+    var scale = d3.scale.quantize().domain(support).range(binIndices);
     for(var i = 0, ii = support.length; i < ii; i++) {
       var x = support[i];
       var j = scale(x);
