@@ -854,11 +854,12 @@ function renderSpec(spec, _options) {
     //var vgSpec.marks
   }
 
-  var resultContainer;
-
   if (runningInBrowser()) {
-    if (wpEditor && wpEditor.makeResultContainer) {
-      resultContainer = wpEditor.makeResultContainer()
+    if (!_.has(wpEditor, 'makeResultContainer')) {
+      // TODO: if running in browser but editor isn't present, append graphic to body
+    } else {
+
+      var resultContainer = wpEditor.makeResultContainer()
 
       var r = React.createElement(GraphComponent,
                                   _.extend({spec: vgSpec},
@@ -887,9 +888,6 @@ function renderSpec(spec, _options) {
                       });
 
       })
-
-    } else {
-      // TODO: if running in browser but editor isn't present, append graphic to body
     }
   } else {
     vg.parse.spec(vgSpec,
