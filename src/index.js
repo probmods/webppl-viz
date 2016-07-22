@@ -1015,7 +1015,9 @@ function hist(obj, options) {
 
   var xValues, xTickLabels, yValues;
 
+  var xType, xDomain;
   if (_.every(support, _.isNumber)) {
+    xType = 'quantitative';
 
     var min = _.min(support), max = _.max(support),
         binWidth = (max-min)/options.numBins;
@@ -1042,7 +1044,9 @@ function hist(obj, options) {
     }, []);
     xValues = binMeans;
     yValues = binProbs;
+    xDomain = [min,max];
   } else {
+    xType = 'nominal';
     xValues = support.map(stringifyIfObject);
     yValues = probs;
   }
@@ -1050,19 +1054,25 @@ function hist(obj, options) {
   var df = xValues.map(function(x,i) {
     var y = yValues[i]
     return _.object([['x', x],['y',y]])
-  })
+  });
+
+  if (xType == 'nominal') {
+    df = _.sortBy(df, function(row) { return row.x })
+    xTickLabels = _.pluck(df, 'x');
+    xDomain = xTickLabels;
+  }
 
   var vlSpec = {
     data: {values: df},
     mark: "bar",
     encoding: {
       x: {field: 'x',
-          type: options.xType,
+          type: xType,
           axis: {title: options.xLabel,
-                 values: xTickLabels || xValues
+                 values: xTickLabels
                 },
           scale: {zero: false,
-                  domain: [min, max]
+                  domain: xDomain
                  }},
       y: {field: 'y',
           type: "quantitative",
