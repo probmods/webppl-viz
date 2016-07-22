@@ -1013,24 +1013,27 @@ function hist(obj, options) {
     support = rawSupport;
   }
 
-  var xValues, xTickLabels, yValues;
+  var xType, xDomain, xValues, xTickLabels, yValues,
+      barWidth;
 
-  var xType, xDomain;
   if (_.every(support, _.isNumber)) {
     xType = 'quantitative';
+    // a heuristic hack to make the bars thinner when there are more bins
+    // TODO: do this in a more principled way
+    barWidth = 120 / options.numBins;
 
-    var min = _.min(support), max = _.max(support),
-        binWidth = (max-min)/options.numBins;
+    // compute domain
+    var min = _.min(support), max = _.max(support);
+    xDomain = [min,max];
 
-    var binIndices = d3.range(options.numBins),
+    // bins and their properties
+    var binWidth = (max-min)/options.numBins,
+        binIndices = d3.range(options.numBins),
         bins = binIndices.map(function() { return [] }),
-        binProbs = binIndices.map(function() { return 0 }),
-        binMeans = binIndices.map(function(i) {
-          return (min + (i + 0.5) * binWidth)
-        });
+        binProbs = binIndices.map(function() { return 0 });
 
     // place values into the appropriate bins
-    var scale = d3.scale.quantize().domain(support).range(binIndices);
+    var scale = d3.scale.quantize().domain(xDomain).range(binIndices);
     for(var i = 0, ii = support.length; i < ii; i++) {
       var x = support[i];
       var j = scale(x);
@@ -1042,9 +1045,12 @@ function hist(obj, options) {
       var extent = scale.invertExtent(x);
       return acc.concat(i == 0 ? extent : extent[1])
     }, []);
-    xValues = binMeans;
+
+    // x center of each bar
+    xValues = _.zip(_.initial(xTickLabels,1),
+                    _.rest(xTickLabels)).map(function(pair) { return (pair[0] + pair[1])/2 });
+    // height of each bar
     yValues = binProbs;
-    xDomain = [min,max];
   } else {
     xType = 'nominal';
     xValues = support.map(stringifyIfObject);
@@ -1080,17 +1086,10 @@ function hist(obj, options) {
           // TODO: get false working
           scale: {zero: true}
          },
-      // TODO: this is a heuristic hack to make the bars thinner
-      // if there are more bins
-      size: {value: 120 / options.numBins }
+      size: xType == 'nominal' ? {} : {value: barWidth}
     }
   };
-
-  renderSpec(vlSpec, {smartNumbers: true})
-
-
-  // barWrapper(supportStringified, probs, _.extend({xLabel: 'Value', yLabel: 'Probability'}, options))
-
+  renderSpec(vlSpec)
 };
 
 function scatter(df, options) {
