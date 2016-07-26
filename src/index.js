@@ -1075,7 +1075,8 @@ function hist(obj, options) {
       x: {field: 'x',
           type: xType,
           axis: {title: options.xLabel,
-                 values: xTickLabels
+                 values: xTickLabels,
+                 labelAngle: 270
                 },
           scale: {zero: false,
                   domain: xDomain
