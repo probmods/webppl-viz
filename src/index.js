@@ -65,25 +65,26 @@ function samplesToErp(xs) {
   return ret;
 }
 
-// a data frame is an array of objects where
-// all objects have the same keys
-// TODO: do with underscore
+// a data frame is an array of objects where all objects have the same keys
 function isDataFrame(arr) {
-  var first_keys = _.keys(arr[0]);
-  if (first_keys.length > 0) {
-    //check if same keys all the way through
-    for (var i=0; i<arr.length; i++) {
-      var ith_keys = _.keys(arr[i]);
-      for (var j=0; j<arr.length; j++) {
-        if (ith_keys[j] != first_keys[j]) {
-          return false;
-        }
-      }
-    }
-    return true;
-  } else {
-    return false;
+  var firstKeys = _.keys(arr[0]);
+
+  // arrays of arrays (matrices) are not dataframes
+  if (_.isArray(arr[0])) {
+    return false
   }
+  if (firstKeys.length == 0) {
+    return false
+  }
+
+  //check if same keys all the way through
+  for (var i=0, ii = arr.length; i< ii; i++) {
+    var rowKeys = _.keys(arr[i]);
+    if (!_.isEqual(firstKeys, rowKeys)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isVector(arr) {
