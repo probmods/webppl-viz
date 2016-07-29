@@ -1443,8 +1443,9 @@ function marginals(erp, options) {
       }
 
       // only call print if running in browser
-      if (runningInBrowser())
-          print(field + ":");
+      if (runningInBrowser()) {
+        print(field + ":");
+      }
 
       viz.auto(fauxErp, options)
     }
