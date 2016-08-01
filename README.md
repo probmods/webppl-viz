@@ -1,3 +1,5 @@
+**Notice: The architecture of this library is still evolving, so expect (many) backwards-incompatible changes**
+
 WebPPL visualization library. Demo: [probmods.github.io/webppl-viz/](http://probmods.github.io/webppl-viz/).
 
 Dependencies: webppl (0.8.1 or later), webppl-editor (eeb3208 or later)
