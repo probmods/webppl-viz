@@ -77,6 +77,12 @@ viz.hist(MH( function() { return {p: uniform(0, 1)} }, 1000), {numBins: 10})</co
   return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}
 }, 500))</code></pre>
 
+    auto samples:
+    <pre><code>var samp = function() { categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}
+
+viz.auto(repeat(100, function() { return {fruit: samp()} }));
+viz.auto(repeat(100, function() { return samp() }));</code></pre>
+
     c:
     <pre><code>viz.auto(ParticleFilter(function() {
   return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}

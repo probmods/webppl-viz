@@ -42,7 +42,7 @@ function scorer(erp, val) {
 }
 
 // convert a list of samples to an ERP
-function samplesToErp(xs) {
+function samplesToDist(xs) {
   var n = xs.length;
 
   var frequencies = _.countBy(xs, function(x) { return JSON.stringify(x) });
@@ -568,14 +568,19 @@ function auto(obj, options) {
     )
   };
 
-  if (!isDist(obj)) {
+  var dist;
+  if (_.isArray(obj)) {
+    dist = samplesToDist(obj)
+  } else if (isDist(obj)) {
+    dist = obj;
+  } else {
     // TODO: write wpEditor.warn method, use it to inform user that auto only works on ERPs
     // (though maybe this isn't necessary since we are using __print__ decorator in wp-editor?)
     // maybe warn and fall back to print
-    throw new Error('viz.auto() doesn\'t know how to render ' + obj.toString());
+    throw new Error('auto takes a distribution or a list of samples as an argument')
   }
 
-  var support = obj.support();
+  var support = dist.support();
   // TODO: use switch statement here
   var supportStructure = (isVector(support)
                           ? 'vector'
@@ -587,11 +592,11 @@ function auto(obj, options) {
 
   // fall back to table when support is not nicely structured
   if (supportStructure == 'other') {
-    return table(obj);
+    return table(dist);
   }
 
   var scores = _.map(support,
-                     function(state){return scorer(obj, state)});
+                     function(state){return scorer(dist, state)});
 
   if (isVector(support)) {
     // promote vector into data frame with a single column ("state")
@@ -995,7 +1000,7 @@ function hist(obj, options) {
 
   var erp;
   if (_.isArray(obj)) {
-    erp = samplesToErp(obj)
+    erp = samplesToDist(obj)
   } else if (isDist(obj)) {
     erp = obj;
   } else {
@@ -1386,7 +1391,7 @@ function table(obj, options) {
 
   var erp;
   if (_.isArray(obj)) {
-    erp = samplesToErp(obj)
+    erp = samplesToDist(obj)
   } else if (isDist(obj)) {
     erp = obj;
   } else {
