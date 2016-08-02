@@ -2,12 +2,16 @@
 
 WebPPL visualization library. Demo: [probmods.github.io/webppl-viz/](http://probmods.github.io/webppl-viz/).
 
-Dependencies: webppl (0.8.1 or later), webppl-editor (eeb3208 or later)
+Dependencies: 
+
+- Cairo
+- webppl (0.8.1 or later)
+- *(optional)* webppl-editor (eeb3208 or later)
 
 Usage:
 
-- Browser: build (run `grunt bundle`) and then include webppl-viz.js and webppl-viz.css on your web page.
 - Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages)
+- Browser: build (run `grunt bundle`) and then include webppl-viz.js and webppl-viz.css on your web page.
 
 ## Plotting data
 
