@@ -1229,7 +1229,7 @@ function heatMap(arg, options) {
         "scale": "x",
         "offset": 16,
         "ticks": 10,
-        "title": keys[0],
+        "title": keys ? keys[0] : 'x',
         "properties": {
           "labels": {
             "angle": {
@@ -1246,7 +1246,7 @@ function heatMap(arg, options) {
         "scale": "y",
         "offset": 16,
         "ticks": 10,
-        "title": keys[1]
+        "title": keys ? keys[1] : 'y'
       }
     ],
     "marks": [
