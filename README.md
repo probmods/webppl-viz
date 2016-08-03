@@ -4,9 +4,9 @@ WebPPL visualization library. Demo: [probmods.github.io/webppl-viz/](http://prob
 
 Dependencies: 
 
-- Cairo
 - webppl (0.8.1 or later)
 - *(optional)* webppl-editor (eeb3208 or later)
+- Cairo (see [instructions for your operating system](https://github.com/Automattic/node-canvas/#installation))
 
 Usage:
 
