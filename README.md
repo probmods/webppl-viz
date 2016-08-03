@@ -8,9 +8,20 @@ Dependencies:
 - *(optional)* webppl-editor (eeb3208 or later)
 - Cairo (see [instructions for your operating system](https://github.com/Automattic/node-canvas/#installation))
 
+Installation:
+
+```sh
+cd ~                             # or however you get to the home directory
+mkdir .webppl                    # make a folder called .webppl (if it doesn't already exist)
+npm install probmods/webppl-viz  # install this node package
+```
+
 Usage:
 
-- Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages)
+- Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages). Example:
+  ```sh
+  webppl foo.wppl --require webppl-viz
+  ```
 - Browser: build (run `grunt bundle`) and then include webppl-viz.js and webppl-viz.css on your web page.
 
 ## Plotting data
