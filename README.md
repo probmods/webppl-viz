@@ -18,10 +18,7 @@ npm install probmods/webppl-viz  # install this node package
 
 Usage:
 
-- Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages). Example:
-  ```sh
-  webppl foo.wppl --require webppl-viz
-  ```
+- Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages). Example: `webppl foo.wppl --require webppl-viz`
 - Browser: build (run `grunt bundle`) and then include webppl-viz.js and webppl-viz.css on your web page.
 
 ## Plotting data
