@@ -436,7 +436,8 @@ kindPrinter.cccr = require('./cccr');
 function parallelCoordinates(args, options) {
   var types = args.types,
       support = args.support,
-      scores = args.scores;
+      scores = args.scores,
+      options = options || {};
 
   var fieldNames = _.keys(support[0]);
 
@@ -468,13 +469,17 @@ function parallelCoordinates(args, options) {
 
   var individualScales = _.map(fieldNames,
                                function(name) {
+                                 var domain = (options.bounds && options.bounds[name])
+                                     ? options.bounds[name]
+                                     : {data: 'values', field: name};
+
                                  return {
                                    name: name,
                                    type: "linear",
                                    range: "height",
                                    zero: false,
                                    nice: true,
-                                   domain: {data: 'values', field: name}
+                                   domain: domain
                                  }
                                });
 
@@ -1471,6 +1476,7 @@ var viz = {
   density: density,
   line: lineWrapper,
   table: table,
+  parCoords: parallelCoordinates,
   heatMap: heatMap,
   marginals: marginals,
   renderSpec: renderSpec,

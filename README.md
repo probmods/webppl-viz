@@ -101,7 +101,7 @@ Basic methods for visualizing samples and marginal distributions. These plot dat
 
 #### Parallel coordinates
 
-TODO
+TODO: document this
 
 ## Plotting distributions (complex)
 
