@@ -812,7 +812,7 @@ function renderSpec(spec, _options) {
             if (scale.nice) {
               sc.nice()
             }
-            var ticks = sc.ticks(axis.ticks);
+            var ticks = axis.values || sc.ticks(axis.ticks);
 
             // score formatters by the length of the longest string they produce on ticks
             var scores = _.map(
