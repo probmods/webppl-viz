@@ -1298,9 +1298,17 @@ function density(x, options) {
     return _.isNumber(z) ? z : _.values(z)[0];
   }
 
+  // TODO: this is done slightly differently in hist; use a common approach
   var xIsErp = isDist(x);
   var support = xIsErp ? _.map(x.support(), extractNumber) : x,
       weights = xIsErp ? _.map(getScores(x), Math.exp) : false;
+
+  if (xIsErp && isDataFrame(x.support())) {
+    var key = _.keys(x.support()[0])[0];
+    options.xLabel = options.xLabel || key;
+  } else {
+    options.xLabel = 'Value';
+  }
 
   var min, max;
   if (options.bounds == 'auto') {
@@ -1319,7 +1327,7 @@ function density(x, options) {
     "encoding": {
       "x": {"field": "item",
             "type": "quantitative",
-            axis: {title: 'Value'},
+            axis: {title: options.xLabel},
             scale: {domain: [min,max], zero: false}
            },
       "y": {"field": "density","type": "quantitative", axis: {title: 'Density'}}
