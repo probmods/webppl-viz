@@ -1029,25 +1029,26 @@ function hist(obj, options) {
 
   if (_.every(support, _.isNumber)) {
     xType = 'quantitative';
-    // a heuristic hack to make the bars thinner when there are more bins
-    // TODO: do this in a more principled way
-    barWidth = 120 / options.numBins;
 
     // compute domain
     var min = _.min(support), max = _.max(support);
     xDomain = [min,max];
 
     // bins and their properties
-    var binWidth = (max-min)/options.numBins,
-        binIndices = d3.range(options.numBins),
+    var numBins = max > min ? options.numBins : 1,
+        binIndices = d3.range(numBins),
         bins = binIndices.map(function() { return [] }),
         binProbs = binIndices.map(function() { return 0 });
+
+    // a heuristic hack to make the bars thinner when there are more bins
+    // TODO: do this in a more principled way
+    barWidth = 120 / numBins;
 
     // place values into the appropriate bins
     var scale = d3.scale.quantize().domain(xDomain).range(binIndices);
     for(var i = 0, ii = support.length; i < ii; i++) {
       var x = support[i];
-      var j = scale(x);
+      var j = scale(x) || 0; // the || 0 part applies when max = min
       bins[j].push(x);
       binProbs[j] += probs[i];
     }
@@ -1086,11 +1087,11 @@ function hist(obj, options) {
       x: {field: 'x',
           type: xType,
           axis: {title: options.xLabel,
-                 values: xTickLabels,
+                 values: _.unique(xTickLabels),
                  labelAngle: 270
                 },
           scale: {zero: false,
-                  domain: xDomain
+                  domain: max == min ? [0.9 * min, 1.1 * max] : xDomain
                  }},
       y: {field: 'y',
           type: "quantitative",
