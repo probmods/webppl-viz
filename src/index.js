@@ -1001,7 +1001,7 @@ function barWrapper() {
 // - create custom ticks so that bars sit in between ticks
 function hist(obj, options) {
   options = _.defaults(options || {},
-                       {numBins: 30})
+                       {numBins: 12})
 
   var erp;
   if (_.isArray(obj)) {
