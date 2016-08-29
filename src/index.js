@@ -1476,7 +1476,12 @@ var coarsen = function(xs, numBins) {
   return xs.map(function(x) { return scale(x) + '' })
 }
 
-var viz = {
+var viz = function(s,k,a) {
+  var args = Array.prototype.slice.call(arguments, 3);
+  return k(s, auto.apply(null, args));
+}
+
+var vizExtensions = {
   d3auto: require('./old').print,
   auto: auto,
   bar: barWrapper,
@@ -1492,6 +1497,12 @@ var viz = {
   stats: stats,
   coarsen: coarsen
 }
+
+_.each(vizExtensions,
+       function(v,k) {
+         viz[k] = v
+       })
+
 
 if (typeof module !== 'undefined' && module.exports) {
   exports = module.exports = viz;
