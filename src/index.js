@@ -1353,8 +1353,8 @@ function line(df, options) {
     "data": {values: df},
     "mark": "line",
     "encoding": {
-      "x": {"field": xName, "type": "quantitative"},
-      "y": {"field": yName, "type": "quantitative"}
+      "x": {"field": xName, axis: {title: options.xLabel || xName}, "type": "quantitative"},
+      "y": {"field": yName, axis: {title: options.yLabel || yName}, "type": "quantitative"}
     }
   };
 
