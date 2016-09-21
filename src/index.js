@@ -555,7 +555,8 @@ function auto(obj, options) {
     // - can we support list of reals a la dirichlet?
     // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
     if (_.every(columnValues, _.isNumber)) {
-      return _.every(columnValues, Number.isInteger) ? 'categorical' : 'real'
+      // TODO: possibly treat integers differently?
+      return _.every(columnValues, Number.isInteger) ? 'real' : 'real'
     } else {
       return 'categorical'
     }

@@ -2,7 +2,7 @@
 
 WebPPL visualization library. Demo: [probmods.github.io/webppl-viz/](http://probmods.github.io/webppl-viz/).
 
-Dependencies: 
+Dependencies:
 
 - webppl (0.8.1 or later)
 - *(optional)* webppl-editor (eeb3208 or later)
@@ -139,7 +139,7 @@ Let's use `c` to denote categorical variables and `r` for real variables (for no
 | Support element | Type                         | Notes                                              |
 | --------------- | ---------------------------- | -------------------------------------------------- |
 | String          | `c`                          |                                                    |
-| Integer         | `c`                          |                                                    |
+| Integer         | `r`                          |                                                    |
 | Real number     | `r`                          |                                                    |
 | Object          | concatenation of component types | The type of `{fruit: 'apple', price: 3.6}` is `rc` |
 | Array           | concatenation of component types | The type of `[9.2, 8.1, 'candy bar']` is `rrc`     |
