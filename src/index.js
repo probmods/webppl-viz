@@ -1027,7 +1027,11 @@ function hist(obj, options) {
   var xType, xDomain, xValues, xTickLabels, yValues,
       barWidth;
 
-  if (_.every(support, _.isNumber)) {
+  if (!_.every(support, _.isNumber)) {
+    xType = 'nominal';
+    xValues = support.map(stringifyIfObject);
+    yValues = probs;
+  } else {
     xType = 'quantitative';
 
     // compute domain
@@ -1063,10 +1067,6 @@ function hist(obj, options) {
                     _.rest(xTickLabels)).map(function(pair) { return (pair[0] + pair[1])/2 });
     // height of each bar
     yValues = binProbs;
-  } else {
-    xType = 'nominal';
-    xValues = support.map(stringifyIfObject);
-    yValues = probs;
   }
 
   var df = xValues.map(function(x,i) {
@@ -1091,7 +1091,7 @@ function hist(obj, options) {
                  labelAngle: 270
                 },
           scale: {zero: false,
-                  domain: max == min ? [0.9 * min, 1.1 * max] : xDomain
+                  domain: (xType == 'quantitative' && max == min) ? [0.9 * min, 1.1 * max] : xDomain
                  }},
       y: {field: 'y',
           type: "quantitative",
