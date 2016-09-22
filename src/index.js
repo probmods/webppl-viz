@@ -763,7 +763,8 @@ function renderSpec(spec, _options) {
                            {regularVega: false,
                             fileName: false,
                             smartNumbers: true,
-                            smartTickLabels: true
+                            smartTickLabels: true,
+                            callback: function() { }
                            })
 
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
@@ -895,8 +896,8 @@ function renderSpec(spec, _options) {
         vg.parse.spec(vgSpec,
                       function(error, chart) {
                         $(node).empty();
-
                         comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
+                        options.callback()
                       });
 
       })
@@ -910,6 +911,7 @@ function renderSpec(spec, _options) {
 
                     require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
+                    options.callback()
                   });
 
   }
@@ -1478,8 +1480,16 @@ var coarsen = function(xs, numBins) {
 }
 
 var viz = function(s,k,a) {
-  var args = Array.prototype.slice.call(arguments, 3);
-  return k(s, auto.apply(null, args));
+  var _args = Array.prototype.slice.call(arguments, 3);
+  // create a callback that will eventually get consumed by renderSpec
+  var callback = function() {
+    return k(s, null)
+  };
+  // avoid mutating _args
+  var args = [_args[0],
+              _.extend({callback: callback}, (_args[1] || {}))
+             ];
+  return auto.apply(null, args);
 }
 
 var vizExtensions = {
