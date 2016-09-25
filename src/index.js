@@ -187,26 +187,71 @@ kindPrinter.r = function(args, options) {
 kindPrinter.cc = function(args, options) {
   var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
-  var field1Name = fieldNames[0];
-  var field2Name = fieldNames[1];
+  var field1Name = fieldNames[0],
+      field1Levels = _.unique(_.pluck(support, field1Name)).length;
+  var field2Name = fieldNames[1],
+      field2Levels = _.unique(_.pluck(support, field2Name)).length;
 
   var data = _.zip(support, scores).map(function(x) {
     return _.extend({prob: Math.exp(x[1])}, x[0])
-  })
+  });
 
-  var vlSpec = {
-    data: {values: data},
-    mark: "text",
-    encoding: {
-      row: {field: field1Name, type: 'nominal'},
-      column: {field: field2Name, type: 'nominal'},
-      color: {field: 'prob', type: 'quantitative'},
-      text: {field: 'prob', type: 'quantitative'}
-      // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
-      // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
-    },
-    config: {mark: {applyColorToBackground: true}, numberFormat: ".1e"}
+  var vlSpec;
+
+  if (field1Levels > 5 && field2Levels > 5) {
+    // heat map
+
+    vlSpec = {
+      data: {values: data},
+      mark: "text",
+      encoding: {
+        row: {field: field1Name, type: 'nominal'},
+        column: {field: field2Name, type: 'nominal'},
+        color: {field: 'prob', type: 'quantitative'},
+        text: {field: 'prob', type: 'quantitative'}
+        // size and color don't work perfectly; stumbles on visualizing vanilla 2d gaussian from MH (no conditioning)
+        // because MH can result in there being only a single unique score value (relative probabilities between states are not preserved in posterior)
+      },
+      config: {mark: {applyColorToBackground: true}, numberFormat: ".1e",
+               scale: {textBandWidth: 40}
+              }
+    }
+  } else {
+    // colored bar plot
+
+    var xName = field1Levels > field2Levels ? field1Name : field2Name;
+    var gName = field1Levels > field2Levels ? field2Name : field1Name;
+
+    vlSpec = {
+      data: {values: data},
+      mark: "bar",
+      encoding: {
+        column: {
+          "field": xName, "type": "ordinal",
+          "scale": {"padding": 4},
+          "axis": {"orient": "bottom", "axisWidth": 1, "offset": -8, "labelAngle": 270}
+        },
+        x: {
+          "field": gName, "type": "ordinal",
+          "scale": {"bandSize": 6},
+          "axis": false
+        },
+        color: {
+          field: gName,
+          type: 'nominal',
+          scale: {range: "category10"}
+        },
+        y: {field: 'prob',
+            type: "quantitative",
+            axis: {title: 'Probability', format: ',r'} // TODO: smartNumbers formatting for this
+            // TODO: enable this once i write a custom spec for hist
+            //scale: {zero: false}
+           }
+      },
+      config: {"facet": {"cell": {"strokeWidth": 0}}}
+    };
   }
+
 
   renderSpec(vlSpec, options);
 }
@@ -1480,6 +1525,7 @@ var coarsen = function(xs, numBins) {
 }
 
 var viz = function(s,k,a) {
+  // TODO: support calling from vanilla js
   var _args = Array.prototype.slice.call(arguments, 3);
   // create a callback that will eventually get consumed by renderSpec
   var callback = function() {

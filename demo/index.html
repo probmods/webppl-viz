@@ -127,6 +127,12 @@ viz.marginals(MH(function() {
   return {
     fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"]),
     boolean: flip(0.7)
+  }}))
+
+viz.auto(Enumerate(function() {
+  return {
+    x: binomial({n: 6, p: 0.5}) + "",
+    y: binomial({n: 6, p: 0.3}) + ""
   }}))</code></pre>
 
     cr:
