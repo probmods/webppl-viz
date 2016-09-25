@@ -151,7 +151,7 @@ How each type is visualized:
 |------|---------------|
 | `c`| histogram |
 | `r`| density plot |
-| `cc`| frequency table |
+| `cc`| bar plot (but if both dimensions have size >5, then heat map) |
 | `cr`| density curve, colors for different categorical groups |
 | `rr`| scatter plot (TODO| add heatmap) |
 | `ccc`| trellis frequency table |
