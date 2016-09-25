@@ -88,9 +88,17 @@ viz.density(repeat(1e2, function() { return uniformDraw(['a','b']) })) // TODO: 
     </code></pre>
 
     table:
-    <pre><code>viz.table(ParticleFilter(function() {
-  return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}
-}, 500))</code></pre>
+    <pre><code>var dist = ParticleFilter(function() {
+  return {fruit: categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"]),
+          bread: uniformDraw(["sourdough", "wheat"])
+         }
+}, 500);
+
+viz.table(dist, {destructure: false, log: false})
+viz.table(dist, {destructure: false, log: true})
+viz.table(dist, {destructure: true, log: false})
+viz.table(dist, {destructure: true, log: true})
+viz.table(dist, {destructure: true, log: false, top: 3})</code></pre>
 
     auto samples:
     <pre><code>var samp = function() { categorical([0.1, 0.2, 0.3, 0.4], ["apple", "banana", "orange", "grape"])}

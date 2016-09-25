@@ -1448,7 +1448,8 @@ function table(obj, options) {
 
   options = _.defaults(options || {},
                        {log: false,
-                        top: false
+                        top: false,
+                        destructure: true
                        })
 
   var erp;
@@ -1471,17 +1472,40 @@ function table(obj, options) {
     sortedZipped = sortedZipped.slice(0, options.top)
   }
 
-  var tableString = '<table class="wviz-table"><tr><th>state</th><th>' + (options.log ? 'log probability' : 'probability') + '</th>';
+  var tableString = '<table class="wviz-table">';
+
+  var headerString = '<tr>';
+  if (options.destructure) {
+    headerString += _.keys(support[0]).map(function(k) {
+      return '<th>' + k + '</th>';
+    }).join('');
+  } else {
+    headerString = '<th>state</th>'
+  }
+
+  headerString += '<th>' + (options.log ? 'log probability' : 'probability') + '</th>';
+  headerString += '</tr>';
+  tableString += headerString;
 
   sortedZipped.forEach(function(pair) {
     var state = pair[0];
     var score = pair[1];
-    tableString += "<tr><td>" + JSON.stringify(state) + "</td><td>" + (options.log ? score : Math.exp(score)) + "</td>"
+
+    var rowString = "<tr>";
+    if (options.destructure) {
+      rowString += _.values(state).map(function(v) {
+        return "<td>" + (v + '') + "</td>"
+      }).join("");
+    } else {
+      rowString += '<td>' + JSON.stringify(state) + '</td>'
+    }
+    rowString += "<td>" + (options.log ? score : Math.exp(score)) + "</td>"
+    rowString += "</tr>";
+    tableString += rowString;
   })
 
   var resultContainer = wpEditor.makeResultContainer();
   resultContainer.innerHTML = tableString;
-
 }
 
 // TODO: display in a wrapped row
