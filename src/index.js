@@ -1553,7 +1553,7 @@ var viz = function(s,k,a) {
   var _args = Array.prototype.slice.call(arguments, 3);
   // create a callback that will eventually get consumed by renderSpec
   var callback = function() {
-    return k(s, null)
+    return k(s, undefined)
   };
   // avoid mutating _args
   var args = [_args[0],
