@@ -1208,7 +1208,7 @@ function heatMap(arg, options) {
   if (!isDist(arg)) {
     samples = arg;
   } else {
-    var n = options.n;
+    var n = arg.params.numSamples;
     var support = arg.support();
 
     support.forEach(function(s) {
