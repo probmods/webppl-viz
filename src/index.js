@@ -942,7 +942,7 @@ function renderSpec(spec, _options) {
                       function(error, chart) {
                         $(node).empty();
                         comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
-                        options.callback()
+                        global.resumeTrampoline(options.callback)
                       });
 
       })
@@ -956,7 +956,7 @@ function renderSpec(spec, _options) {
 
                     require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
-                    options.callback()
+                    util.trampolineRunners.cli()( options.callback() )
                   });
 
   }
