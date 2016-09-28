@@ -942,7 +942,10 @@ function renderSpec(spec, _options) {
                       function(error, chart) {
                         $(node).empty();
                         comp.setState({view: chart({el:node, renderer: 'svg'}).update()});
-                        global.resumeTrampoline(options.callback)
+                        var tr = global['resumeTrampoline'];
+                        if (tr) {
+                          tr(options.callback)
+                        }
                       });
 
       })
