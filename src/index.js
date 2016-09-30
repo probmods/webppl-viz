@@ -159,6 +159,28 @@ kindPrinter.c = function(args, options) {
   barWrapper(values, probs, _.extend({xLabel: fieldName, yLabel: 'frequency'}, options))
 }
 
+kindPrinter.i = function(args, options) {
+  var dist = args.dist, support = args.support;
+  var fieldNames = _.keys(support[0]);
+  var fieldName = fieldNames[0];
+
+  var valuesNonZero = _.pluck(support, fieldName),
+      values = _.range(_.min(valuesNonZero), _.max(valuesNonZero) + 1);
+
+  var probs = values.map(function(v) {
+    if (_.contains(valuesNonZero, v)) {
+      return Math.exp(dist.score(fieldName == '(state)' ?
+                                 v :
+                                 _.object([fieldName], [v])))
+    } else {
+      return 0;
+    }
+  })
+
+  barWrapper(values, probs, _.extend({xLabel: fieldName, yLabel: 'frequency'}, options))
+}
+
+
 kindPrinter.r = function(args, options) {
   var scores = args.scores, types = args.types, support = args.support;
   var fieldNames = _.keys(support[0]);
@@ -604,7 +626,7 @@ function auto(obj, options) {
     // - would knowing type information from the forward model (e.g., foo ~ multinomial([a,b,c])) help?
     if (_.every(columnValues, _.isNumber)) {
       // TODO: possibly treat integers differently?
-      return _.every(columnValues, Number.isInteger) ? 'real' : 'real'
+      return _.every(columnValues, Number.isInteger) ? 'integer' : 'real'
     } else {
       return 'categorical'
     }
@@ -653,7 +675,16 @@ function auto(obj, options) {
     throw new Error('autoviz takes a distribution or a list of samples as an argument')
   }
 
-  var support = dist.support();
+  var support;
+  if (dist.support) {
+    support = dist.support();
+  } else if (dist.meta.name == 'Poisson') {
+    console.info('viz: Setting support = {0, ..., 10} for Poisson distribution')
+    support = _.range(11);
+  } else {
+    throw new Error('distribution has no support')
+  }
+
   // TODO: use switch statement here
   var supportStructure = (isVector(support)
                           ? 'vector'
@@ -675,14 +706,14 @@ function auto(obj, options) {
     // promote vector into data frame with a single column ("state")
     // so that we can directly use kindPrinter.c or kindPrinter.r
     support = support.map(function(x) {
-      return {state: x}
+      return {'(state)': x}
     });
   }
 
   if (!isDataFrame(support) && isPseudoDataFrame(support)) {
     support = support.map(function(x) {
       var n = x.length;
-      var keys = _.range(0,n).map(function(i) { return 'state_' + i + ''});
+      var keys = _.range(0,n).map(function(i) { return '(state_' + i + ')'});
       return _.object(keys, x);
     })
   }
@@ -704,14 +735,29 @@ function auto(obj, options) {
   if (dfKind.indexOf('c') == -1 && dfKind.length >= 3) {
     parallelCoordinates({types: columnTypesDict,
                          support: supportStringified,
-                         scores: scores},
+                         scores: scores,
+                         dist: dist
+                        },
                         options);
   } else if (_.has(kindPrinter, dfKind)) {
     // NB: passes in supportStringified, not support
     kindPrinter[dfKind]({types: columnTypesDict,
                          support: supportStringified,
-                         scores: scores},
+                         scores: scores,
+                         dist: dist
+                        },
                         options)
+  } else if (_.has(kindPrinter, dfKind.replace(/i/g, 'c'))) {
+    var _typesDict = _.mapObject(columnTypesDict,
+                             function(v,k) { return v == 'integer' ? 'categorical' : v });
+
+    kindPrinter[dfKind]({types: _typesDict,
+                         support: supportStringified,
+                         scores: scores,
+                         dist: dist
+                        },
+                        options)
+
   } else {
     // TODO: switch to warning rather than error
     // (and maybe use wpEditor.put to store the data)

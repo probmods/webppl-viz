@@ -203,6 +203,28 @@ viz.auto(Enumerate(function() {
   return {x: x, y: y, z: z};
 },500))</code></pre>
 
+    base distributions:
+    <pre><code>
+viz(Gaussian({mu: 0, sigma: 1}))
+viz(Beta({a: 1, b: 1}))
+viz(Exponential({a: 5}))
+viz(Gamma({shape: 2, scale: 2}))
+viz(Cauchy({location: -50, scale: 10}))
+viz(MultivariateGaussian({mu: Vector([2,-3]),
+                          cov: Matrix([[1,0.5],
+                                       [0.5,1]])
+                         }))
+
+viz(Binomial({p: .5, n: 5}))
+viz(Rejection(function() {
+  return {x: uniformDraw(_.range(20))}
+}, {samples: 5}))
+
+
+viz(Dirichlet({alpha: Vector([2,1]) }))
+viz(Dirichlet({alpha: Vector([1,1,1]) }), {samples: 200})
+viz(Poisson({mu: 5}))</code></pre>
+
     </div>
     <div class="col">
 
