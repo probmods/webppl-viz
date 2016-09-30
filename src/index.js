@@ -1634,7 +1634,6 @@ var viz = function(s,k,a) {
 }
 
 var vizExtensions = {
-  d3auto: require('./old').print,
   auto: auto,
   bar: barWrapper,
   hist: hist,
