@@ -748,15 +748,16 @@ function auto(obj, options) {
                         },
                         options)
   } else if (_.has(kindPrinter, dfKind.replace(/i/g, 'c'))) {
+    var transformedKind = dfKind.replace(/i/g, 'c');
     var _typesDict = _.mapObject(columnTypesDict,
                              function(v,k) { return v == 'integer' ? 'categorical' : v });
 
-    kindPrinter[dfKind]({types: _typesDict,
-                         support: supportStringified,
-                         scores: scores,
-                         dist: dist
-                        },
-                        options)
+    kindPrinter[transformedKind]({types: _typesDict,
+                                  support: supportStringified,
+                                  scores: scores,
+                                  dist: dist
+                                 },
+                                 options)
 
   } else {
     // TODO: switch to warning rather than error
