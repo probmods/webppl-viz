@@ -52,11 +52,11 @@ function samplesToDist(xs) {
   var support = _.keys(frequencies).map(function(x) { return JSON.parse(x) });
   var probabilities = _.mapObject(frequencies, function(freq, key) { return freq/n });
 
-  var scorer = function(params, x) {
+  var scorer = function(x) {
     return Math.log(probabilities[JSON.stringify(x)]);
   }
 
-  var sampler = function(params) {
+  var sampler = function() {
     return global.categorical(probabilities, support);
   }
 
