@@ -22,16 +22,7 @@ var jslintSettings = {
 };
 module.exports = function(grunt) {
   grunt.initConfig({
-    subgrunt: {
-      // TODO: after browserifying webppl, move to demo folder
-      webppl: {
-        'node_modules/webppl': 'browserify'
-      },
-      'webppl-editor': {
-        'node_modules/webppl-editor': ['browserify','css']
-      }
-    },
-    nodeunit: {
+   nodeunit: {
       all: ['tests/test-*.js']
     },
     jshint: {
@@ -91,13 +82,6 @@ module.exports = function(grunt) {
   grunt.registerTask('lint', ['gjslint']);
   grunt.registerTask('hint', ['jshint']);
   grunt.registerTask('fixstyle', ['fixjsstyle']);
-
-  grunt.registerTask('setup-demo', 'Build and install webppl.js and webppl-editor.js to demo', function() {
-    grunt.task.run('subgrunt');
-    //fs.createReadStream('node_modules/webppl/bundle/webppl.js').pipe(fs.createWriteStream('demo/webppl.js'));
-    //fs.createReadStream('node_modules/webppl-editor/bundle/webppl-editor.js').pipe(fs.createWriteStream('demo/webppl-editor.js'));
-    //fs.createReadStream('node_modules/webppl-editor/bundle/webppl-editor.css').pipe(fs.createWriteStream('demo/webppl-editor.css'));
-  });
 
   grunt.registerTask('bundle', 'Create browser bundle (= css + browserify + uglify)', function() {
     var taskArgs = (arguments.length > 0) ? ':' + _.toArray(arguments).join(':') : '';
