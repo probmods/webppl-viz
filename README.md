@@ -1,177 +1,94 @@
-**Notice: The architecture of this library is still evolving, so expect (many) backwards-incompatible changes**
+Visualization for WebPPL. [Demo](http://probmods.github.io/webppl-viz/)
 
-WebPPL visualization library. Demo: [probmods.github.io/webppl-viz/](http://probmods.github.io/webppl-viz/).
+### Dependencies
 
-Dependencies:
-
+- node.js (v4 or later)
 - webppl (0.9.2-b0139d4 or later)
-- *(optional)* webppl-editor (eeb3208 or later)
 - Cairo (see [instructions for your operating system](https://github.com/Automattic/node-canvas/#installation))
+- *(optional)* webppl-editor (1.0.5 or later)
 
-Installation:
+TODO: refactor this into setup for browser versus setup for command line
 
-```sh
-cd ~                             # or however you get to the home directory
-mkdir .webppl                    # make a folder called .webppl (if it doesn't already exist)
-npm install probmods/webppl-viz  # install this node package
+### Setup
+
+```
+npm install --prefix ~/.webppl probmods/webppl-viz
 ```
 
-Usage:
+To use on the command line, you need require `webppl-viz` as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages). Example: `webppl foo.wppl --require webppl-viz`
 
-- Command-line: require as a [WebPPL package](http://docs.webppl.org/en/master/packages.html#webppl-packages). Example: `webppl foo.wppl --require webppl-viz`
-- Browser: build (run `grunt bundle`) and then include webppl-viz.js and webppl-viz.css on your web page. (You can also bundle this with core webppl when building that for the browser.)
+To include `webppl-viz` in a browser, include webppl-viz.js and webppl-viz.css on your webpage.
+You can get pre-compiled versions of these at TODO: link to GH releases.
+To build these yourself, run `grunt bundle`.
 
-## Plotting data
+### Basic usage
 
-Methods for plotting raw data.
+The `viz()` function visualizes two kinds of data: WebPPL *distributions* and *data frames*.
 
-#### Bar plot
+A data frame is an array of objects that all have the same keys (i.e., they have the same *schema*).
+For example:
 
-`viz.bar(df, [options])`
-
-`viz.bar(xs, ys, [options])`
-
-*Options*:
-
-- `horizontal` (default: false). (TODO) draw a horizontal plot rather than vertical one.
-- `xLabel` (default: x). x axis label.
-- `yLabel` (default: y). y axis label.
-- `xType` (default: nominal). type of x axis (nominal or quantitative).
-- `groupBy` (default: none). Grouping variable for different bars.
-
-#### Line plot
-
-`viz.line(df, [options])`
-
-`viz.line(xs, ys, [options])`
-
-*Options*:
-
-- `xLabel` (default: x). x axis label.
-- `yLabel` (default: y). y axis label.
-- `groupBy` (default: none). Grouping variable for different lines.
-
-#### Scatter plot
-
-`viz.scatter(xs, ys, [options])`
-
-`viz.scatter(df, [options])`
-
-*Options*:
-
-- `xLabel` (default: x). x axis label.
-- `yLabel` (default: y). y axis label.
-
-## Plotting distributions (basic)
-
-Basic methods for visualizing samples and marginal distributions. These plot data that are up to 2-dimensional.
-
-#### Table
-
-`viz.table(dist, [options])`
-
-`viz.table(samples, [options])`
-
-*Options*:
-
-- `destructure` (default = true). Expand support keys as columns of the table.
-- `log` (default = false). If true, shows log probabilities.
-- `top` (default = false). If a number `n`, only shows top `n` results.
-
-
-#### Histogram
-
-`viz.hist(samples, [options])`
-
-`viz.hist(dist, [options])`
-
-*Options*:
-
-- `numBins` (defaults to 30). For real-valued data, how many bins to aggregate data into.
-
-#### Density plot
-
-`viz.density(samples, [options])`
-
-`viz.density(dist, [options])`
-
-*Options*:
-
-- `bounds` (default: min and max of the supplied samples). An array of bounds for density estimation
-
-#### Heat map
-
-`viz.heatMap(samples, [options])`
-
-`viz.heatMap(dist, [options])`
-
-*Options*:
-
-- `bandwidthX` (TODO)
-- `bandwidthY` (TODO)
-- `boundsX` (TODO)
-- `boundsY` (TODO)
-
-#### Parallel coordinates
-
-TODO: document this
-
-## Plotting distributions (complex)
-
-More complex methods for visualizing smaples and distributions. These can plot data that are higher dimensional.
-
-#### Marginals
-
-`viz.marginals(dist)` shows each component of a joint distribution `dist` -- density plots for real components and histograms for categorical components.
-
-#### Automatic visualization
-
-`viz.auto` tries to automatically construct a useful visualization based on the types of the different components in the posterior.
-
-*Options*:
-
-- `summarize` (default = false). (TODO) For data with real-valued components, you can either try to show all the data (scatter plot) or summarize by showing a density estimate (heat map). This option has no effect if data is entirely categorical.
-
-**How it works**
-
-`viz.auto` uses the *types* of the components to constrain visualization.
-Let's use `c` to denote categorical variables and `r` for real variables (for now, ordinal variables are treated as categorical). Some examples of types:
-
-| Support element | Type                         | Notes                                              |
-| --------------- | ---------------------------- | -------------------------------------------------- |
-| String          | `c`                          |                                                    |
-| Integer         | `r`                          |                                                    |
-| Real number     | `r`                          |                                                    |
-| Object          | concatenation of component types | The type of `{fruit: 'apple', price: 3.6}` is `rc` |
-| Array           | concatenation of component types | The type of `[9.2, 8.1, 'candy bar']` is `rrc`     |
-
-
-How each type is visualized:
-
-| Type | Visualization |
-|------|---------------|
-| `c`| histogram |
-| `r`| density plot |
-| `cc`| bar plot (but if both dimensions have size >5, then heat map) |
-| `cr`| density curve, colors for different categorical groups |
-| `rr`| scatter plot (TODO| add heatmap) |
-| `ccc`| trellis frequency table |
-| `ccr`| trellis density plot, colors for different categorical groups |
-| `crr`| trellis scatter plot (TODO| add trellis heatmap) |
-| `rrr+` | parallel coordinates plot |
-| `cccc`| trellis frequency table (TODO) |
-| `cccr`| trellis scatter plot (TODO| add trellis heat map) |
-| `ccrr`| trellis scatter plot / heat map (TODO) |
-| `crrr`| trellis parallel coordinates plot (TODO) |
-| `ccrrr`| trellis parallel coordinates plot (TODO) |
-
-### Development notes
-
-```sh
-grunt setup-demo       # make webppl and webppl-editor dependencies for demo
-grunt bundle           # compile js + minify, make css
-grunt browserify       # compiling js
-grunt uglify           # minify js
-grunt browserify-watch # watchified compile js
-grunt css              # make css
+```javascript
+viz([{country: 'usa', populationRank: 6, gdp: 12.5435},
+     {country: 'mex', populationRank: 10, gdp: 12.5435},
+     {country: 'can', populationRank: 9, gdp: 12321.4}])
 ```
+
+Distribution elements do not need to be objects with keys, although this is recommended:
+
+```javascript
+viz(MH(function() { return          beta(2,1) }),   5) // okay
+viz(MH(function() { return {weight: beta(2,1) } }), 5) // better
+```
+
+`viz` tries to automatically guess a useful graph.
+If you'd like to change the graph, you can pass an additional options argument.
+
+### Specifying options
+
+##### Output size and format
+
+```js
+viz(d,
+    {width: 100,
+     height: 200,
+     format: 'svg' // can also use png
+    })
+```
+##### Changing variable types
+
+viz chooses a graph using the *types* of variables in your data -- nominal (e.g., "usa"), ordinal (e.g., 6), or quantitative (e.g., 12.5435).
+viz guesses the type of each variable using heuristics:
+
+- strings are considered nominal
+- booleans and integer numbers are considered ordinal
+- non-integer numbers are considered quantitative
+
+Sometimes, you might want to override these heuristics.
+You can do this by changing the type of a variable:
+
+```js
+viz([{country: 'usa', populationRank: 6, gdp: 12.5435},
+     {country: 'mex', populationRank: 10, gdp: 12.5435},
+     {country: 'can', populationRank: 9, gdp: 12321.4}],
+    {decoding: {populationRank: 'quantitative'}})
+```
+Here, we are treating `populationRank` as a continuous variable rather than a discrete one.
+
+##### Changing graph types
+
+flipping bar graph
+
+```js
+var dist = Rejection(function() { 
+var a = Math.round(beta(3,1) * 9);
+var b = Math.round(beta(2,4) * 9);
+condition(a + b > 4);
+return {a: a, b: b};
+
+}, 5)
+```
+
+
+
+raw data versus aggregate: point versus line
