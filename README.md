@@ -71,24 +71,47 @@ You can do this by changing the type of a variable:
 viz([{country: 'usa', populationRank: 6, gdp: 12.5435},
      {country: 'mex', populationRank: 10, gdp: 12.5435},
      {country: 'can', populationRank: 9, gdp: 12321.4}],
-    {decoding: {populationRank: 'quantitative'}})
+    {fields: {populationRank: {type: 'quantitative'}}})
 ```
 Here, we are treating `populationRank` as a continuous variable rather than a discrete one.
 
 ##### Changing graph types
 
-flipping bar graph
+###### Flipping bar graph
+by default, bar graphs are displayed horizontally (it's a more efficient use of space on the screen). but if you wanted to flip the orientation, you can do:
+
+```js
+viz(MH(function() { return {success: flip(0.5)}}, 10),
+    {fields: {success:  {display: 'x'},
+              __prob__: {display: 'y'}
+    }})
+```
+
+here, we are telling `viz` to map the `__prob__` field to the y dimension and the `success` field to the x dimension.
+
+###### setting bounds of variables:
 
 ```js
 var dist = Rejection(function() { 
-var a = Math.round(beta(3,1) * 9);
-var b = Math.round(beta(2,4) * 9);
-condition(a + b > 4);
+var a = Math.round(beta(3,1) * 100);
+var b = Math.round(beta(2,4) * 100);
+condition(a + b > 40);
 return {a: a, b: b};
-
-}, 5)
+}, 100)
+viz(dist,
+    {fields: {__prob__: {scale: {domain: [0, 50]}})
 ```
 
+adjust angle of axis tick labels
 
 
-raw data versus aggregate: point versus line
+
+
+
+
+## open questions
+
+names of vega marks are unintuitive (e.g., "text" for heat map, "line" for density)
+
+
+raw data versus aggregate: point versus line?
