@@ -103,15 +103,8 @@ dimension and the =success= field to the x dimension.
 ** setting bounds of variables
 
 #+BEGIN_SRC js
-var dist = Rejection(function() {
-  var a = Math.round(beta(3,1) * 100);
-  var b = Math.round(beta(2,4) * 30);
-  condition(a + b > 40);
-  return {a: a, b: b};
-}, 100);
-
-viz(dist, {fields: {{a: {scale: {domain: [0, 100]}}},
-                    {b: {scale: {domain: [0, 30]}}}})
+viz(MH(function() { return {dollars: Math.round(beta(3,1) * 1000) } }, 100),
+    {fields: {dollars: {scale: {domain: [0, 100]}}}})
 #+END_SRC
 
 ** adjust angle of axis tick labels
