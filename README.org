@@ -109,6 +109,12 @@ viz(MH(function() { return {dollars: Math.round(beta(3,1) * 1000) } }, 100),
 
 ** adjust angle of axis tick labels
 
+#+BEGIN_SRC js
+viz(MH(function() {return {word: uniformDraw(['prolixity','verbosity',
+                                             'long-windedness','pleonastically'])}}, 20),
+    {fields: {word: {axis: {labelAngle: 45}}}})
+#+END_SRC
+
 ** aggregating data
 
 * open questions
