@@ -87,41 +87,36 @@ than a discrete one.
 ** Changing graph types
 
 ** Flipping bar graph
-       :PROPERTIES:
-       :CUSTOM_ID: flipping-bar-graph
-       :END:
 
-by default, bar graphs are displayed horizontally (it's a more efficient
-use of space on the screen). but if you wanted to flip the orientation,
-you can do:
+by default, bar graphs are displayed horizontally (it's a more efficient use of space on the screen). but if you wanted to flip the orientation, you can do:
 
 #+BEGIN_SRC js
-    viz(MH(function() { return {success: flip(0.5)}}, 10),
-        {fields: {success:  {display: 'x'},
-                  __prob__: {display: 'y'}
-        }})
+viz(MH(function() { return {success: flip(0.5)}}, 10),
+    {fields: {success:  {display: 'x'},
+              __prob__: {display: 'y'}
+    }})
 #+END_SRC
 
 here, we are telling =viz= to map the =__prob__= field to the y
 dimension and the =success= field to the x dimension.
 
-** setting bounds of variables:
-       :PROPERTIES:
-       :CUSTOM_ID: setting-bounds-of-variables
-       :END:
+** setting bounds of variables
 
 #+BEGIN_SRC js
-    var dist = Rejection(function() {
-    var a = Math.round(beta(3,1) * 100);
-    var b = Math.round(beta(2,4) * 100);
-    condition(a + b > 40);
-    return {a: a, b: b};
-    }, 100)
-    viz(dist,
-        {fields: {__prob__: {scale: {domain: [0, 50]}})
+var dist = Rejection(function() {
+  var a = Math.round(beta(3,1) * 100);
+  var b = Math.round(beta(2,4) * 30);
+  condition(a + b > 40);
+  return {a: a, b: b};
+}, 100);
+
+viz(dist, {fields: {{a: {scale: {domain: [0, 100]}}},
+                    {b: {scale: {domain: [0, 30]}}}})
 #+END_SRC
 
-adjust angle of axis tick labels
+** adjust angle of axis tick labels
+
+** aggregating data
 
 * open questions
 
