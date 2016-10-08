@@ -67,7 +67,7 @@ viz(MH(function() { return {weight: beta(2,1) } }),
 
 You can use a custom transformation function by passing in a function (note -- passing in a function you have defined in WebPPL will not work, because WebPPL transforms function methods at compile time. You need to pass in a reference to a JavaScript function).
 
-You can view log probabilities instead of probabilities if you set =transform= to be ='log'=:
+You can view log probabilities instead of probabilities if you set =transform= to be src_js{'log'}
 
 #+BEGIN_SRC js
 viz(MH(function() { return {weight: beta(2,1) } }),
