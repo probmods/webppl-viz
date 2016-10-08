@@ -119,7 +119,20 @@ viz(MH(function() {return {word: uniformDraw(['prolixity','verbosity',
 
 * open questions
 
-names of vega marks are unintuitive (e.g., "text" for heat map, "line"
-for density)
+clearly distinguish between transforms and visualization
+- but offer shortcuts for common combinations, like heatMap and densityCurve
+- would 2d density estimator work on a crr distribution?
+  - generalize to work with any number of non-r dimensions?
+- idea: add a smooth argument that does smoothing by default but can be turned off.
+
+
+names of vega marks are unintuitive (e.g., "text" for heat map, "line" for density)
+- further mitigate by adding aliases ("table" -> "text")
 
 raw data versus aggregate: point versus line?
+
+handling thorny base Distributions:
+- Poisson (ordinal but no support() method)
+- Gaussian (isContinuous; no support() method)
+- Beta (isContinuous; has support())
+- Dirichlet (isContinuous; distribution over tensors)
