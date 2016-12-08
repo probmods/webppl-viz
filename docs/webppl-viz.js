@@ -72334,7 +72334,7 @@ function table(obj, options) {
     var rowString = "<tr>";
     if (options.destructure) {
       rowString += _.values(state).map(function (v) {
-        return "<td>" + (v + '') + "</td>";
+        return "<td>" + JSON.stringify(v) + "</td>";
       }).join("");
     } else {
       rowString += '<td>' + JSON.stringify(state) + '</td>';
