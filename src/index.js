@@ -1567,10 +1567,10 @@ function table(obj, options) {
     var rowString = "<tr>";
     if (options.destructure) {
       rowString += _.values(state).map(function(v) {
-        return "<td>" + JSON.stringify(v) + "</td>"
+        return "<td>" + stringifyIfObject(v) + "</td>"
       }).join("");
     } else {
-      rowString += '<td>' + JSON.stringify(state) + '</td>'
+      rowString += '<td>' + stringifyIfObject(state) + '</td>'
     }
     rowString += "<td>" + (options.log ? score : Math.exp(score)) + "</td>"
     rowString += "</tr>";
