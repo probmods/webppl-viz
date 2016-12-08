@@ -71467,7 +71467,8 @@ function parallelCoordinates(args, options) {
 }
 
 // automatically render an ERP
-function auto(obj, options) {
+function auto(obj, _options) {
+  var options = _.defaults(_options || {}, {});
   var getColumnType = function (columnValues) {
     // for now, support real, integer, and categorical
     // some questions:
