@@ -100,13 +100,16 @@ viz.table(dist, {destructure: true, log: false})
 viz.table(dist, {destructure: true, log: true})
 viz.table(dist, {destructure: true, log: false, top: 3})
 
+// stringify cell contents if they're objects
 viz.table(Enumerate(function() {
   return [
     {x: uniformDraw(['a','b']), y: uniformDraw(['c','d'])},
     {x: uniformDraw(['e','f']), y: uniformDraw(['g','h'])}
   ]
 }))
-    </code></pre>
+
+// make sure table handles non-object support values
+viz.table(Enumerate(function() { uniformDraw(['a','b','c']) }))</code></pre>
 
 heat map:
     <pre><code>

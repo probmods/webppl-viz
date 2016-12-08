@@ -1534,8 +1534,9 @@ function table(obj, options) {
     throw new Error('table takes an ERP or a list of samples as an argument')
   }
 
-  var support = erp.support();
-  var scores = support.map(function(state) { return scorer(erp,state) });
+  var support = erp.support(),
+      supportKeys = _.keys(support[0]),
+      scores = support.map(function(state) { return scorer(erp,state) });
 
   var sortedZipped = _.sortBy(_.zip(support, scores),function(z) {
     return -z[1]
@@ -1547,13 +1548,16 @@ function table(obj, options) {
 
   var tableString = '<table class="wviz-table">';
 
+  var doDestructure = options.destructure && supportKeys.length > 0;
+
   var headerString = '<tr>';
-  if (options.destructure) {
-    headerString += _.keys(support[0]).map(function(k) {
+  if (doDestructure) {
+
+    headerString += supportKeys.map(function(k) {
       return '<th>' + k + '</th>';
     }).join('');
   } else {
-    headerString = '<th>state</th>'
+    headerString = '<th>(state)</th>'
   }
 
   headerString += '<th>' + (options.log ? 'log probability' : 'probability') + '</th>';
@@ -1565,7 +1569,7 @@ function table(obj, options) {
     var score = pair[1];
 
     var rowString = "<tr>";
-    if (options.destructure) {
+    if (doDestructure) {
       rowString += _.values(state).map(function(v) {
         return "<td>" + stringifyIfObject(v) + "</td>"
       }).join("");
