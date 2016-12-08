@@ -66,13 +66,13 @@ var upload = function(params) {
 
 upload({
   Key: 'webppl-viz-' + hash + '.js',
-  Body: getFile('bundle/webppl-viz.js'),
+  Body: getFile('docs/webppl-viz.js'),
   ContentType: 'application/javascript'
 });
 
 upload({
   Key: 'webppl-viz-' + hash + '.css',
-  Body: getFile('bundle/webppl-viz.css'),
+  Body: getFile('docs/webppl-viz.css'),
   ContentType: 'text/css'
 });
 
@@ -82,13 +82,13 @@ upload({
 if (tag !== '') {
   upload({
     Key: 'webppl-viz-' + tag + '.js',
-    Body: getFile('bundle/webppl-viz.js'),
+    Body: getFile('docs/webppl-viz.js'),
     ContentType: 'application/javascript'
   });
 
   upload({
     Key: 'webppl-viz-' + tag + '.css',
-    Body: getFile('bundle/webppl-viz.css'),
+    Body: getFile('docs/webppl-viz.css'),
     ContentType: 'text/css'
   });
 
