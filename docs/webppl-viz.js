@@ -13351,7 +13351,7 @@ load.headers = {};
 
 module.exports = load;
 
-},{"../util":34,"fs":1,"request":1,"sync-request":1,"url":1}],27:[function(require,module,exports){
+},{"../util":34,"fs":2,"request":2,"sync-request":2,"url":2}],27:[function(require,module,exports){
 var util = require('../util'),
   type = require('./type'),
   formats = require('./formats'),
@@ -15003,7 +15003,7 @@ function truncateOnWord(s, len, rev) {
 var truncate_word_re = /([\u0009\u000A\u000B\u000C\u000D\u0020\u00A0\u1680\u180E\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u2028\u2029\u3000\uFEFF])/;
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":1}],35:[function(require,module,exports){
+},{"buffer":2}],35:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -72439,7 +72439,7 @@ if (typeof module !== 'undefined' && module.exports) {
 global.viz = viz;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./cccr":390,"./stats":392,"d3":10,"fs":2,"jquery":61,"md5":65,"react":210,"react-dom":67,"underscore":212,"vega":327,"vega-lite":286}],392:[function(require,module,exports){
+},{"./cccr":390,"./stats":392,"d3":10,"fs":1,"jquery":61,"md5":65,"react":210,"react-dom":67,"underscore":212,"vega":327,"vega-lite":286}],392:[function(require,module,exports){
 var _ = require('underscore');
 var d3 = require('d3');
 
