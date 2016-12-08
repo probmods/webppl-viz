@@ -1594,12 +1594,14 @@ function marginals(erp, options) {
   _.each(
     fields,
     function(field) {
-      var support = _.unique(_.pluck(fullSupport, field)); // extract field of interest
+      //var support = _.unique(_.pluck(fullSupport, field)); // extract field of interest
+      var support = _.unique(fullSupport.map(function(x) { return _.pick(x, field)}),
+                             JSON.stringify);
 
       var fauxErp = {
         support: function() { return support },
-        score: function(fieldValue) {
-          var rows = _.where(fullTable, _.object([field], [fieldValue]));
+        score: function(x) {
+          var rows = _.where(fullTable, x);
           var scores = _.pluck(rows, '__score__');
           return util.logsumexp(scores);
         }

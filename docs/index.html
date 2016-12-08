@@ -203,6 +203,19 @@ viz.auto(Enumerate(function() {
   return {x: x, y: y, z: z};
 },500))</code></pre>
 
+    marginals:
+    <pre><code>var model = function(){
+  var my_mu = sample(Gaussian({mu: 0, sigma: 31}))
+  var my_sigma = sample(Uniform({a:0.0, b:10.0}))
+  observe(Gaussian({mu: my_mu, sigma: my_sigma}), 1.1)
+  observe(Gaussian({mu: my_mu, sigma: my_sigma}), 1.9)
+  observe(Gaussian({mu: my_mu, sigma: my_sigma}), 2.3)
+  observe(Gaussian({mu: my_mu, sigma: my_sigma}), 1.8)
+  return {mu: my_mu, sigma: my_sigma}
+}
+var posterior = Infer({method: 'rejection', samples: 10, maxScore: -2.32}, model)
+viz.marginals(posterior)</code></pre>
+
     base distributions:
     <pre><code>
 viz(Gaussian({mu: 0, sigma: 1}))
