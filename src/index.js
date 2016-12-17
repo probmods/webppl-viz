@@ -1529,10 +1529,10 @@ function lineWrapper() {
 // and smart hiding if there are too many rows
 function table(obj, options) {
   //wpEditor is not present if not run in the browser
-  if (typeof(wpEditor) === 'undefined') {
-    console.log("viz.print: no wpEditor, not drawing");
-    return;
-  }
+  // if (typeof(wpEditor) === 'undefined') {
+  //   console.log("viz.print: no wpEditor, not drawing");
+  //   return;
+  // }
 
   options = _.defaults(options || {},
                        {log: false,
@@ -1596,8 +1596,14 @@ function table(obj, options) {
     tableString += rowString;
   })
 
-  var resultContainer = wpEditor.makeResultContainer();
-  resultContainer.innerHTML = tableString;
+  if (options.fileName) {
+    require('fs').writeFileSync(options.fileName, tableString);
+    console.log("Rendered to " + options.fileName);
+  }
+  if (!(typeof(wpEditor) === 'undefined')) {
+    var resultContainer = wpEditor.makeResultContainer();
+    resultContainer.innerHTML = tableString;
+  }
 }
 
 // TODO: display in a wrapped row
