@@ -1471,29 +1471,28 @@ function line(df, options) {
   // TODO: assert that groupBy variable is actually in the df
 
   var vlSpec = {
+    "data": {values: df},
     "mark": "line",
+    "transform": {"filter": []},
     "encoding": {
       "x": {"field": xName, axis: {title: options.xLabel || xName}, "type": "quantitative"},
       "y": {"field": yName, axis: {title: options.yLabel || yName}, "type": "quantitative"}
     }
   };
 
-  var min, max;
-  var filteredDf = df;
+  //var filteredDf = df;
   if (options.xBounds) {
-      min = options.xBounds[0];
-      max = options.xBounds[1];
-      filteredDf = _.filter(filteredDf, function(d){ return d[xName] >= min && d[xName] <= max; });
-      vlSpec.encoding.x.scale = {domain: [min,max], zero: false};
+      //filteredDf = _.filter(filteredDf, function(d){ return d[xName] >= min && d[xName] <= max });
+      vlSpec.transform.filter.push({"field": xName, "range": options.xBounds});
+      vlSpec.encoding.x.scale = {domain: options.xBounds, zero: false};
   }
   if (options.yBounds) {
-      min = options.yBounds[0];
-      max = options.yBounds[1];
-      filteredDf = _.filter(filteredDf, function(d){ return d[yName] >= min && d[yName] <= max; });
-      vlSpec.encoding.y.scale = {domain: [min,max], zero: false};
+      //filteredDf = _.filter(filteredDf, function(d){ return d[yName] >= min && d[yName] <= max });
+      vlSpec.transform.filter.push({"field": yName, "range": options.yBounds});
+      vlSpec.encoding.y.scale = {domain: options.yBounds, zero: false};
   }
 
-  vlSpec.data = {values: filteredDf};
+  //vlSpec.data = {values: filteredDf};
 
   if (options.groupBy) {
     vlSpec.encoding.color = {
