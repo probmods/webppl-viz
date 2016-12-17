@@ -1471,13 +1471,29 @@ function line(df, options) {
   // TODO: assert that groupBy variable is actually in the df
 
   var vlSpec = {
-    "data": {values: df},
     "mark": "line",
     "encoding": {
       "x": {"field": xName, axis: {title: options.xLabel || xName}, "type": "quantitative"},
       "y": {"field": yName, axis: {title: options.yLabel || yName}, "type": "quantitative"}
     }
   };
+
+  var min, max;
+  var filteredDf = df;
+  if (options.xBounds) {
+      min = options.xBounds[0];
+      max = options.xBounds[1];
+      filteredDf = _.filter(filteredDf, function(d){ return d[xName] >= min && d[xName] <= max; });
+      vlSpec.encoding.x.scale = {domain: [min,max], zero: false};
+  }
+  if (options.yBounds) {
+      min = options.yBounds[0];
+      max = options.yBounds[1];
+      filteredDf = _.filter(filteredDf, function(d){ return d[yName] >= min && d[yName] <= max; });
+      vlSpec.encoding.y.scale = {domain: [min,max], zero: false};
+  }
+
+  vlSpec.data = {values: filteredDf};
 
   if (options.groupBy) {
     vlSpec.encoding.color = {
