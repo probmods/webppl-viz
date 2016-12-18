@@ -1473,23 +1473,26 @@ function line(df, options) {
   var vlSpec = {
     "data": {values: df},
     "mark": "line",
-    "transform": {"filter": []},
     "encoding": {
       "x": {"field": xName, axis: {title: options.xLabel || xName}, "type": "quantitative"},
       "y": {"field": yName, axis: {title: options.yLabel || yName}, "type": "quantitative"}
     }
   };
 
+  var filter = []
   //var filteredDf = df;
   if (options.xBounds) {
       //filteredDf = _.filter(filteredDf, function(d){ return d[xName] >= min && d[xName] <= max });
-      vlSpec.transform.filter.push({"field": xName, "range": options.xBounds});
+      filter.push({"field": xName, "range": options.xBounds});
       vlSpec.encoding.x.scale = {domain: options.xBounds, zero: false};
   }
   if (options.yBounds) {
       //filteredDf = _.filter(filteredDf, function(d){ return d[yName] >= min && d[yName] <= max });
-      vlSpec.transform.filter.push({"field": yName, "range": options.yBounds});
+      filter.push({"field": yName, "range": options.yBounds});
       vlSpec.encoding.y.scale = {domain: options.yBounds, zero: false};
+  }
+  if (filter.length) {
+    vlSpec.transform = {"filter": filter};
   }
 
   //vlSpec.data = {values: filteredDf};
