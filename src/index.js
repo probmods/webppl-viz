@@ -1463,7 +1463,8 @@ function density(x, options) {
 // TODO: show points too
 function line(df, options) {
   options = _.defaults(options || {},
-                       {groupBy: false})
+                       {groupBy: false,
+                        strokeWidth: 2})
 
   var xName = _.keys(df[0])[0];
   var yName = _.keys(df[0])[1];
@@ -1473,6 +1474,9 @@ function line(df, options) {
   var vlSpec = {
     "data": {values: df},
     "mark": "line",
+    "config": {
+      "mark": {"strokeWidth": options.strokeWidth}
+    },
     "encoding": {
       "x": {"field": xName, axis: {title: options.xLabel || xName}, "type": "quantitative"},
       "y": {"field": yName, axis: {title: options.yLabel || yName}, "type": "quantitative"}
