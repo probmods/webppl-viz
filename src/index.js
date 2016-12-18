@@ -1535,7 +1535,7 @@ function lineWrapper() {
 // TODO: support a data frame structure as input
 // and smart hiding if there are too many rows
 function table(obj, options) {
-  wpEditor is not present if not run in the browser
+  //wpEditor is not present if not run in the browser
   if (typeof(wpEditor) === 'undefined') {
     console.log("viz.print: no wpEditor, not drawing");
     return;
