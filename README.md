@@ -50,6 +50,8 @@ Methods for plotting raw data.
 - `xLabel` (default: x). x axis label.
 - `yLabel` (default: y). y axis label.
 - `groupBy` (default: none). Grouping variable for different lines.
+- `xBounds` (default: min and max of the supplied data). An array of [min,max] bounds for the x-axis.
+- `yBounds` (default: min and max of the supplied data). An array of [min,max] bounds for the y-axis.
 - `strokeWidth` (default: 2). The line stroke width, in pixels.
 
 #### Scatter plot

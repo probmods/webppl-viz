@@ -1483,6 +1483,24 @@ function line(df, options) {
     }
   };
 
+  var filter = []
+  //var filteredDf = df;
+  if (options.xBounds) {
+      //filteredDf = _.filter(filteredDf, function(d){ return d[xName] >= min && d[xName] <= max });
+      filter.push({"field": xName, "range": options.xBounds});
+      vlSpec.encoding.x.scale = {domain: options.xBounds, zero: false};
+  }
+  if (options.yBounds) {
+      //filteredDf = _.filter(filteredDf, function(d){ return d[yName] >= min && d[yName] <= max });
+      filter.push({"field": yName, "range": options.yBounds});
+      vlSpec.encoding.y.scale = {domain: options.yBounds, zero: false};
+  }
+  if (filter.length) {
+    vlSpec.transform = {"filter": filter};
+  }
+
+  //vlSpec.data = {values: filteredDf};
+
   if (options.groupBy) {
     vlSpec.encoding.color = {
       field: options.groupBy,
