@@ -80,6 +80,7 @@ Basic methods for visualizing samples and marginal distributions. These plot dat
 - `destructure` (default = true). Expand support keys as columns of the table.
 - `log` (default = false). If true, shows log probabilities.
 - `top` (default = false). If a number `n`, only shows top `n` results.
+- `fileName` (default = None). If provided, prints the table into that file in HTML format.
 
 
 #### Histogram
