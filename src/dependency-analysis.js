@@ -260,19 +260,25 @@ var bayesBall = function(dependencies, query, givens) {
 
 // emit a vega spec for the dependency graph
 
-var nodesDf = getTopLevelVars(ast2).map(function(name) { return {name: name} });
+var nodesDf = getTopLevelVars(ast2).map(function(name, i) { return {name: name, index: i} });
+// console.log(nodesDf);
+// process.exit()
 var edgesDf = _.chain(topLevelDependencies(ast2))
     .map(function(vs, k) {
+      console.log(vs)
       return vs.map(function(v) {
-        return {source: v, target: k}
+        var vIndex = _.findWhere(nodesDf, {name: v}).index,
+            kIndex = _.findWhere(nodesDf, {name: k}).index
+        return {source: vIndex, target: kIndex, value: 1}
       })
     })
     .flatten('shallow')
     .value();
 
-console.log(edgesDf);
-
 var vgSpec = {
+  width: 800,
+  height: 500,
+  padding: {top:0, bottom:0, left:0, right:0},
   data: [
     {name: 'edges', values: edgesDf},
     {name: 'nodes', values: nodesDf,
@@ -282,8 +288,7 @@ var vgSpec = {
                   "linkDistance": 30,
                   "linkStrength": 0.5,
                   "charge": -80,
-                  "interactive": true,
-                  "fixed": "fixed"
+                  "interactive": false
                  }]
     }
   ],
@@ -298,7 +303,7 @@ var vgSpec = {
         { "type": "linkpath", "shape": "line" }
       ],
       "properties": {
-        "update": {
+        "enter": {
           "path": {"field": "layout_path"},
           "stroke": {"value": "#ccc"},
           "strokeWidth": {"value": 0.5}
@@ -311,14 +316,10 @@ var vgSpec = {
       "properties": {
         "enter": {
           "fillOpacity": {"value": 0.3},
-          "fill": {"value": "steelblue"}
-        },
-        "update": {
+          "fill": {"value": "steelblue"},
           "x": {"field": "layout_x"},
           "y": {"field": "layout_y"},
           "stroke": [
-            { "test": "indata('fixed', datum._id, 'id')",
-              "value": "firebrick" },
             { "value": "steelblue" }
           ]
         }
