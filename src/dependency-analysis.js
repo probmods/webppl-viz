@@ -246,7 +246,7 @@ var bayesBall = function(dependencies, query, givens) {
       }
     } else {
       if (_.contains(givens, curNode)) {
-        console.log(getParents(curNode));
+        //console.log(getParents(curNode));
         queue = queue.concat(getParents(curNode))
       } else {
         queue = queue.concat(getChildren(curNode))
