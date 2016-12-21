@@ -72230,7 +72230,8 @@ function density(x, options) {
 
 // TODO: show points too
 function line(df, options) {
-  options = _.defaults(options || {}, { groupBy: false });
+  options = _.defaults(options || {}, { groupBy: false,
+    strokeWidth: 2 });
 
   var xName = _.keys(df[0])[0];
   var yName = _.keys(df[0])[1];
@@ -72240,11 +72241,32 @@ function line(df, options) {
   var vlSpec = {
     "data": { values: df },
     "mark": "line",
+    "config": {
+      "mark": { "strokeWidth": options.strokeWidth }
+    },
     "encoding": {
       "x": { "field": xName, axis: { title: options.xLabel || xName }, "type": "quantitative" },
       "y": { "field": yName, axis: { title: options.yLabel || yName }, "type": "quantitative" }
     }
   };
+
+  var filter = [];
+  //var filteredDf = df;
+  if (options.xBounds) {
+    //filteredDf = _.filter(filteredDf, function(d){ return d[xName] >= min && d[xName] <= max });
+    filter.push({ "field": xName, "range": options.xBounds });
+    vlSpec.encoding.x.scale = { domain: options.xBounds, zero: false };
+  }
+  if (options.yBounds) {
+    //filteredDf = _.filter(filteredDf, function(d){ return d[yName] >= min && d[yName] <= max });
+    filter.push({ "field": yName, "range": options.yBounds });
+    vlSpec.encoding.y.scale = { domain: options.yBounds, zero: false };
+  }
+  if (filter.length) {
+    vlSpec.transform = { "filter": filter };
+  }
+
+  //vlSpec.data = {values: filteredDf};
 
   if (options.groupBy) {
     vlSpec.encoding.color = {
@@ -72279,12 +72301,6 @@ function lineWrapper() {
 // TODO: support a data frame structure as input
 // and smart hiding if there are too many rows
 function table(obj, options) {
-  //wpEditor is not present if not run in the browser
-  if (typeof wpEditor === 'undefined') {
-    console.log("viz.print: no wpEditor, not drawing");
-    return;
-  }
-
   options = _.defaults(options || {}, { log: false,
     top: false,
     destructure: true
@@ -72348,8 +72364,14 @@ function table(obj, options) {
     tableString += rowString;
   });
 
-  var resultContainer = wpEditor.makeResultContainer();
-  resultContainer.innerHTML = tableString;
+  if (options.fileName) {
+    require('fs').writeFileSync(options.fileName, tableString);
+    console.log("Rendered to " + options.fileName);
+  }
+  if (!(typeof wpEditor === 'undefined')) {
+    var resultContainer = wpEditor.makeResultContainer();
+    resultContainer.innerHTML = tableString;
+  }
 }
 
 // TODO: display in a wrapped row
