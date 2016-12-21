@@ -91,8 +91,8 @@ var topClosure = currentClosure;
 
 
 
-var rename = function(ast, from, to) {
-  return replace(ast, {
+var rename = function(node, from, to) {
+  return replace(node, {
     enter: function(node, parent) {
       if (node.type == 'Identifier') {
         if (node.name == from) {
@@ -109,7 +109,7 @@ var gensym = function(prefix) {
     gensymDict[prefix] = 0
   }
   gensymDict[prefix] += 1
-  return prefix + (gensymDict[prefix] + '')
+  return prefix + ('__' + gensymDict[prefix])
 }
 
 
@@ -123,7 +123,9 @@ traverse(ast, {
       currentClosure.addVariables(declNames);
     }
     if (node.type == 'FunctionExpression') {
-      var newClosure = new Closure({name: node.id ? node.id.name : false});
+      var newClosure = new Closure({name: node.id ? node.id.name : false,
+                                    node: node
+                                   });
       currentClosure.addChild(newClosure);
       var paramNames = _.pluck(node.params, 'name');
       newClosure.addVariables(paramNames);
@@ -139,4 +141,34 @@ traverse(ast, {
   }
 })
 
-console.log(JSON.stringify(topClosure.orphanize(), null, 1))
+function getNameConflicts(closure) {
+  var names = closure.variables;
+  var current = closure;
+  var conflicts = [];
+  while(current.parent) {
+    conflicts = _.union(conflicts, _.intersection(names, current.parent.variables));
+    current = current.parent;
+  }
+  return conflicts;
+}
+
+// traverse the closures and mutate the ast when renaming is required
+var closuresQueue = [topClosure];
+while(closuresQueue.length > 0) {
+  var closure = closuresQueue.shift();
+
+  // get any name conflicts
+  var nameConflicts = getNameConflicts(closure);
+
+  console.log(nameConflicts);
+  closuresQueue = closuresQueue.concat(closure.children)
+
+  if (nameConflicts.length > 0) {
+    // TODO: optimize this by having rename take an array of froms and tos
+    nameConflicts.forEach(function(name) { rename(closure.node, name, gensym(name)) })
+  }
+}
+
+console.log(escodegen.generate(ast))
+
+// console.log(JSON.stringify(topClosure.orphanize(), null, 1))
