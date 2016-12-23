@@ -4,6 +4,7 @@
 
 var esprima = require('esprima');
 var escodegen = require('escodegen');
+var escope = require('escope');
 
 var traverse = require('estraverse').traverse;
 var replace = require('estraverse').replace;
@@ -92,7 +93,6 @@ var mUntrampolined = [
 
 var ast1 = esprima.parse(mUntrampolined);
 
-var escope = require('escope');
 
 // _ast must be untrampolined
 var uniqueNames = function(_ast) {
@@ -161,16 +161,16 @@ var uniqueNames = function(_ast) {
   // traverse scopes, marking
   while(scopesToTraverse.length) {
     var scope = scopesToTraverse.shift();
-    console.log('inside of:')
-    console.log('------------------------------')
-    console.log(escodegen.generate(scope.block))
-    console.log('------------------------------')
+    // console.log('inside of:')
+    // console.log('------------------------------')
+    // console.log(escodegen.generate(scope.block))
+    // console.log('------------------------------')
 
     var variables = _.chain(scope.variables)
         .pluck('name')
         .without('arguments')
         .value();
-    console.log('variables are', variables.join(', '));
+    // console.log('variables are', variables.join(', '));
 
     // get any conflicts with variables in ancestor scopes
     var ancestorVariables = _.chain(ancestorScopes(scope))
@@ -183,7 +183,7 @@ var uniqueNames = function(_ast) {
     var conflictingNames = _.intersection(variables, ancestorVariables);
 
     if (conflictingNames.length > 0) {
-      console.log('conflicting names are', conflictingNames.join(', '))
+      // console.log('conflicting names are', conflictingNames.join(', '))
 
       conflictingNames.forEach(function(name) {
         // TODO: using findWhere means I don't handle multiple redefinitions of the same variable
@@ -194,43 +194,31 @@ var uniqueNames = function(_ast) {
 
         var newName = gensym(name);
 
-        console.log('renaming', name, 'to', newName);
+        // console.log('renaming', name, 'to', newName);
         changeSites.forEach(function(x) { x.name = newName })
       })
     }
-    console.log('\n')
+    // console.log('\n')
 
     scopesToTraverse = scopesToTraverse.concat(scope.childScopes);
   }
 
 
-  function getNameConflicts(closure) {
-    var names = closure.variables;
-    var current = closure;
-    var conflicts = [];
-    while(current.parent) {
-      conflicts = _.union(conflicts, _.intersection(names, current.parent.variables));
-      current = current.parent;
-    }
-    return conflicts;
-  }
-
-
   return ast;
 }
-// TODO: unique naming fails for this example
-// TODO: use escope
-var source = 'var x = [[1]]; var y = map(function(x) { return x.map(function(x) { return x + 1}) }, x);';
-console.log(escodegen.generate(uniqueNames(esprima.parse(source))))
-process.exit()
+// // test with transformed
+// var source = 'var x = [[1]]; var y = map(function(x) { return x.map(function(x) { var y = x + 1; return y}) }, x);';
+// console.log(escodegen.generate(uniqueNames(esprima.parse(source))))
+// process.exit()
 
-
-
+// test with untransformed
 var ast2b = uniqueNames(ast);
 console.log(escodegen.generate(ast2b));
+process.exit()
 
 var ast2 = uniqueNames(ast1);
 
+// TODO: make this work for the transformed code
 // TODO: filter out variables that are entirely deterministic (i.e., neither random nor derived from random)
 var getTopLevelVars = function(ast) {
   return _.chain(ast.body[0].expression.body.body)
