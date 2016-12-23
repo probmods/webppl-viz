@@ -1,3 +1,7 @@
+/*
+  (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; node src/dependency-analysis.js\n")))
+  */
+
 var esprima = require('esprima');
 var escodegen = require('escodegen');
 
@@ -7,30 +11,73 @@ var _ = require('underscore');
 var lodash = require('lodash');
 var Closure = require('./closure');
 
-function m(globalStore, _k1, _address154) {
-  var _currentAddress = _address154;
-  _addr.save(_globalCurrentAddress, _address154);
-  return function () {
-    return flip(globalStore, function (globalStore, x) {
-      _addr.save(_globalCurrentAddress, _currentAddress);
-      var _k2 = function (globalStore, y) {
+function m() {
+  return _k0(globalStore, function (globalStore, _k1, _address153) {
+    var _currentAddress = _address153;
+    _addr.save(_globalCurrentAddress, _address153);
+    return function () {
+      return flip(globalStore, function (globalStore, x) {
         _addr.save(_globalCurrentAddress, _currentAddress);
-        return function () {
-          return _k1(globalStore, y);
+        var _k4 = function (globalStore, _result3) {
+          _addr.save(_globalCurrentAddress, _currentAddress);
+          return function () {
+            return repeat(globalStore, function (globalStore, y) {
+              _addr.save(_globalCurrentAddress, _currentAddress);
+              return function () {
+                return map(globalStore, function (globalStore, z) {
+                  _addr.save(_globalCurrentAddress, _currentAddress);
+                  return function () {
+                    return _k1(globalStore, z);
+                  };
+                }, _address153.concat('_159'), function (globalStore, _k2, _address154, x) {
+                  var _currentAddress = _address154;
+                  _addr.save(_globalCurrentAddress, _address154);
+                  var y = ad.scalar.add(x, 1);
+                  return function () {
+                    return _k2(globalStore, y);
+                  };
+                }, y);
+              };
+            }, _address153.concat('_158'), 2, _result3);
+          };
         };
-      };
-      return function () {
-        return x ? gaussian(globalStore, _k2, _address154.concat('_157'), 0, 1) : beta(globalStore, _k2, _address154.concat('_158'), 2, 2);
-      };
-    }, _address154.concat('_156'), 0.5);
-  };
-};
+        return function () {
+          return x ? gaussian(globalStore, _k4, _address153.concat('_156'), 0, 1) : beta(globalStore, _k4, _address153.concat('_157'), 2, 2);
+        };
+      }, _address153.concat('_155'), 0.5);
+    };
+  });
+}
 
-var mString = m.toString();
+var ast = esprima.parse(m.toString())
 
-var mAst = esprima.parse(mString);
+var untrampoline = function(ast) {
+  replace(ast,
+          {enter: function(node, parent) {
+
+          }}
+         )
+}
+
+var getReturnVariables = function(ast) {
+  var rets = [];
+  // find where we call the _k1 continuation and extract those arguments (minus globalStore)
+  traverse(
+    ast,
+    {enter: function(node, parent) {
+      if (node.type == 'CallExpression' && node.callee.type == 'Identifier') {
+        if (node.callee.name == '_k1') {
+          rets = _.chain(node.arguments).pluck('name').without('globalStore').value();
+          this.break(); // stops traversing
+        }
+      }
+    }}
+  )
+  return rets;
+}
 
 // undo the trampolining
+
 
 // MOCK
 var mUntrampolined = [
