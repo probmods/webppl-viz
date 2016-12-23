@@ -99,6 +99,7 @@ var uniqueNames = function(_ast) {
   var ast = lodash.cloneDeep(_ast);
 
   var scopeManager = escope.analyze(ast);
+  var topScope = scopeManager.acquire(ast);
 
   var rename = function(topNode, from, to) {
 
@@ -146,39 +147,62 @@ var uniqueNames = function(_ast) {
     return prefix + ('__' + gensymDict[prefix])
   }
 
-
-  var currentClosure = new Closure({name: '__top__'});
-  var topClosure = currentClosure;
-
-
-  // traverse the untrampolined code, keeping a stack of names
-  traverse(ast, {
-    enter: function(node, parent) {
-      //console.log('entering',node.type)
-
-      if (node.type == 'VariableDeclaration') {
-        var declNames = _.pluck(_.pluck(node.declarations, 'id'), 'name');
-
-        currentClosure.addVariables(declNames);
-      }
-      if (node.type == 'FunctionExpression') {
-        var newClosure = new Closure({name: node.id ? node.id.name : false,
-                                      node: node
-                                     });
-        currentClosure.addChild(newClosure);
-        var paramNames = _.pluck(node.params, 'name');
-        newClosure.addVariables(paramNames);
-        currentClosure = newClosure;
-      }
-    },
-    leave: function(node, parent) {
-      if (node.type == 'FunctionExpression') {
-        if (currentClosure.parent) {
-          currentClosure = currentClosure.parent;
-        }
-      }
+  var ancestorScopes = function(scope) {
+    var currScope = scope;
+    var ancestors = [];
+    while(currScope.upper) {
+      currScope = currScope.upper;
+      ancestors.push(currScope);
     }
-  })
+    return ancestors;
+  }
+
+  var scopesToTraverse = [topScope];
+  // traverse scopes, marking
+  while(scopesToTraverse.length) {
+    var scope = scopesToTraverse.shift();
+    console.log('inside of:')
+    console.log('------------------------------')
+    console.log(escodegen.generate(scope.block))
+    console.log('------------------------------')
+
+    var variables = _.chain(scope.variables)
+        .pluck('name')
+        .without('arguments')
+        .value();
+    console.log('variables are', variables.join(', '));
+
+    // get any conflicts with variables in ancestor scopes
+    var ancestorVariables = _.chain(ancestorScopes(scope))
+        .pluck('variables')
+        .flatten()
+        .pluck('name')
+        .without('arguments')
+        .value();
+
+    var conflictingNames = _.intersection(variables, ancestorVariables);
+
+    if (conflictingNames.length > 0) {
+      console.log('conflicting names are', conflictingNames.join(', '))
+
+      conflictingNames.forEach(function(name) {
+        // TODO: using findWhere means I don't handle multiple redefinitions of the same variable
+        var scopeEntry = _.findWhere(scope.variables,{name: name});
+        var defNames = _.pluck(scopeEntry.defs, 'name');
+        var refNames = _.pluck(scopeEntry.references, 'identifier');
+        var changeSites = defNames.concat(refNames);
+
+        var newName = gensym(name);
+
+        console.log('renaming', name, 'to', newName);
+        changeSites.forEach(function(x) { x.name = newName })
+      })
+    }
+    console.log('\n')
+
+    scopesToTraverse = scopesToTraverse.concat(scope.childScopes);
+  }
+
 
   function getNameConflicts(closure) {
     var names = closure.variables;
@@ -191,23 +215,6 @@ var uniqueNames = function(_ast) {
     return conflicts;
   }
 
-  // traverse the closures and mutate the ast, renaming is required
-  var closuresQueue = [topClosure];
-  while(closuresQueue.length > 0) {
-    var closure = closuresQueue.shift();
-
-    // get any name conflicts
-    var nameConflicts = getNameConflicts(closure);
-
-    closuresQueue = closuresQueue.concat(closure.children);
-
-    // console.log('name conflicts are', nameConflicts)
-
-    if (nameConflicts.length > 0) {
-      // TODO: optimize this by having rename take an array of froms and tos
-      nameConflicts.forEach(function(name) { rename(closure.node, name, gensym(name)) })
-    }
-  }
 
   return ast;
 }
