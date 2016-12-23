@@ -92,19 +92,48 @@ var mUntrampolined = [
 
 var ast1 = esprima.parse(mUntrampolined);
 
+var escope = require('escope');
+
 // _ast must be untrampolined
 var uniqueNames = function(_ast) {
   var ast = lodash.cloneDeep(_ast);
-  var rename = function(node, from, to) {
-    return replace(node, {
-      enter: function(node, parent) {
+
+  var scopeManager = escope.analyze(ast);
+
+  var rename = function(topNode, from, to) {
+
+    console.log('\nCALLING RENAME');
+    console.log('renaming', from, 'to', to, 'in', escodegen.generate(topNode))
+    console.log('------------------------------')
+
+    var renamingScope = scopeManager.acquireAll(topNode);
+
+    console.log(renamingScope)
+    process.exit()
+
+    var r = replace(topNode, {
+      leave: function(node, parent) {
         if (node.type == 'Identifier') {
           if (node.name == from) {
-            return _.extend({}, node, {name: to});
+
+            // if (escodegen.generate(parent) == 'x + 1') {
+            //   //console.log(scopeManager.acquire(node))
+            //   console.log('here');
+            //   console.log(escodegen.generate(parent))
+            // }
+
+            if (_.isEqual(scopeManager.acquire(parent), renamingScope) || true) {
+              return _.extend({}, node, {name: to});
+            }
           }
         }
       }
-    })
+    });
+    console.log('RENAMED: ', escodegen.generate(r));
+    console.log('------------------------------')
+    return r;
+
+
   }
 
   var gensymDict = {}
@@ -113,6 +142,7 @@ var uniqueNames = function(_ast) {
       gensymDict[prefix] = 0
     }
     gensymDict[prefix] += 1
+    // console.log('gensym', prefix, gensymDict[prefix]);
     return prefix + ('__' + gensymDict[prefix])
   }
 
@@ -169,7 +199,9 @@ var uniqueNames = function(_ast) {
     // get any name conflicts
     var nameConflicts = getNameConflicts(closure);
 
-    closuresQueue = closuresQueue.concat(closure.children)
+    closuresQueue = closuresQueue.concat(closure.children);
+
+    // console.log('name conflicts are', nameConflicts)
 
     if (nameConflicts.length > 0) {
       // TODO: optimize this by having rename take an array of froms and tos
@@ -179,7 +211,16 @@ var uniqueNames = function(_ast) {
 
   return ast;
 }
+// TODO: unique naming fails for this example
+// TODO: use escope
+var source = 'var x = [[1]]; var y = map(function(x) { return x.map(function(x) { return x + 1}) }, x);';
+console.log(escodegen.generate(uniqueNames(esprima.parse(source))))
+process.exit()
 
+
+
+var ast2b = uniqueNames(ast);
+console.log(escodegen.generate(ast2b));
 
 var ast2 = uniqueNames(ast1);
 
