@@ -1,6 +1,6 @@
 /*
   (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; node src/dependency-analysis.js\n")))
-  */
+*/
 
 var esprima = require('esprima');
 var escodegen = require('escodegen');
@@ -12,6 +12,14 @@ var _ = require('underscore');
 var lodash = require('lodash');
 var Closure = require('./closure');
 
+/*
+  (function() {,
+  var x = flip(0.5); // [x],
+  var y = repeat(2, x ? gaussian(0,1) : beta(2,2)); // [x,y], // TODO: second arg should be a function, not a value
+  var z = map(function (x) { var y = x + 1; return y }, y); // [x,y,x],
+  return z,
+  })
+*/
 function m() {
   return _k0(globalStore, function (globalStore, _k1, _address153) {
     var _currentAddress = _address153;
@@ -91,7 +99,7 @@ var mUntrampolined = [
 ].join('\n')
 
 
-var ast1 = esprima.parse(mUntrampolined);
+var astUntrampolined = esprima.parse(mUntrampolined);
 
 
 // _ast must be untrampolined
@@ -212,15 +220,15 @@ var uniqueNames = function(_ast) {
 // process.exit()
 
 // test with untransformed
-var ast2b = uniqueNames(ast);
-console.log(escodegen.generate(ast2b));
-process.exit()
+// var ast2b = uniqueNames(ast);
+// console.log(escodegen.generate(ast2b));
+// process.exit()
 
-var ast2 = uniqueNames(ast1);
+var ast2 = uniqueNames(ast);
 
 // TODO: make this work for the transformed code
 // TODO: filter out variables that are entirely deterministic (i.e., neither random nor derived from random)
-var getTopLevelVars = function(ast) {
+var getTopLevelVarsUntransformed = function(ast) {
   return _.chain(ast.body[0].expression.body.body)
     .where({type: 'VariableDeclaration'})
     .pluck('declarations')
@@ -229,6 +237,39 @@ var getTopLevelVars = function(ast) {
     .pluck('name')
     .value();
 }
+
+var getTopLevelVars = function(ast) {
+  var vars = [];
+  var whitelistContinuation = true;  // the top level continuation in a model function has an _address in it, so we don't count it as a lower-level cont
+  traverse(
+    ast,
+    {enter: function(node, parent) {
+      if (node.type == 'FunctionExpression') {
+
+        if (whitelistContinuation) {
+          whitelistContinuation = false;
+          return;
+        }
+
+        var variableNames = _.pluck(node.params, 'name');
+
+        if (_.find(variableNames, function(name) { return /_address/.test(name) })) {
+          this.skip();
+        } else {
+          var addedNames = _.reject(variableNames,
+                                    function(name) { return /globalStore/.test(name) || /_k/.test(name) || /_result/.test(name) })
+          vars = vars.concat(addedNames);
+        }
+      }
+    }
+    }
+  )
+  return vars;
+}
+
+console.log(getTopLevelVars(ast2));
+process.exit()
+
 
 // returns all identifiers referenced in a syntax subtree
 var treeIdentifiers = function(t, name) {
