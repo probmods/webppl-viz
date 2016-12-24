@@ -60,14 +60,6 @@ function m() {
 
 var ast = esprima.parse(m.toString())
 
-var untrampoline = function(ast) {
-  replace(ast,
-          {enter: function(node, parent) {
-
-          }}
-         )
-}
-
 var getReturnVariables = function(ast) {
   var rets = [];
   // find where we call the _k1 continuation and extract those arguments (minus globalStore)
@@ -84,23 +76,6 @@ var getReturnVariables = function(ast) {
   )
   return rets;
 }
-
-// undo the trampolining
-
-
-// MOCK
-var mUntrampolined = [
-  '(function() {',
-  'var x = flip(0.5); // [x]',
-  'var y = repeat(2, x ? gaussian(0,1) : beta(2,2)); // [x,y]', // TODO: second arg should be a function, not a value
-  'var z = map(function (x) { var y = x + 1; return y }, y); // [x,y,x]',
-  'return z',
-  '})'
-].join('\n')
-
-
-var astUntrampolined = esprima.parse(mUntrampolined);
-
 
 // _ast must be untrampolined
 var uniqueNames = function(_ast) {
@@ -226,18 +201,8 @@ var uniqueNames = function(_ast) {
 
 var ast2 = uniqueNames(ast);
 
-// TODO: make this work for the transformed code
-// TODO: filter out variables that are entirely deterministic (i.e., neither random nor derived from random)
-var getTopLevelVarsUntransformed = function(ast) {
-  return _.chain(ast.body[0].expression.body.body)
-    .where({type: 'VariableDeclaration'})
-    .pluck('declarations')
-    .flatten()
-    .pluck('id')
-    .pluck('name')
-    .value();
-}
 
+// TODO: filter out variables that are entirely deterministic (i.e., neither random nor derived from random)
 var getTopLevelVars = function(ast) {
   var vars = [];
   var whitelistContinuation = true;  // the top level continuation in a model function has an _address in it, so we don't count it as a lower-level cont
