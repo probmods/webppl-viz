@@ -1,6 +1,7 @@
 var _ = require('underscore');
 var d3 = require('d3');
 var $ = require('jquery');
+var dependencyAnalysis = require('./dependency-analysis');
 
 global.d3 = d3;
 
@@ -1663,6 +1664,10 @@ var viz = function(s,k,a) {
   return auto.apply(null, args);
 }
 
+function vizModel(f) {
+  return dependencyAnalysis.structure(f);
+}
+
 var vizExtensions = {
   auto: auto,
   bar: barWrapper,
@@ -1676,7 +1681,8 @@ var vizExtensions = {
   marginals: marginals,
   renderSpec: renderSpec,
   stats: stats,
-  coarsen: coarsen
+  coarsen: coarsen,
+  model: vizModel
 }
 
 _.each(vizExtensions,

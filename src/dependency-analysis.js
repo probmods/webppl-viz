@@ -3,7 +3,8 @@
 */
 
 var esprima = require('esprima');
-var escodegen = require('escodegen');
+var escodegen = require('escodegen'),
+    gen = escodegen.generate;
 var escope = require('escope');
 
 var traverse = require('estraverse').traverse;
@@ -11,6 +12,7 @@ var replace = require('estraverse').replace;
 var _ = require('underscore');
 var lodash = require('lodash');
 var Closure = require('./closure');
+var SourceMapConsumer = require('source-map').SourceMapConsumer;
 
 /*
   (function() {,
@@ -200,11 +202,37 @@ var uniqueNames = function(_ast) {
 // process.exit()
 
 var ast2 = uniqueNames(ast);
+// console.log(escodegen.generate(ast2));
+// process.exit()
 
 
 // TODO: filter out variables that are entirely deterministic (i.e., neither random nor derived from random)
 var getTopLevelVars = function(ast) {
-  var vars = [];
+  var topLevelVars = [];
+  traverse(ast,
+           {enter: function(node, parent) {
+             if (node.type == 'FunctionExpression') {
+
+               topLevelVars = _.chain(node.body.body)
+                 .where({type: 'VariableDeclaration'})
+                 .pluck('declarations')
+                 .flatten()
+                 .pluck('id')
+                 .pluck('name')
+                 .value();
+
+               this.break();
+             }
+           }}
+          );
+
+  return topLevelVars;
+}
+
+// get top-level vars in CPS code (currently unused)
+// TODO: filter out variables that are entirely deterministic (i.e., neither random nor derived from random)
+var getTopLevelVarsCps = function(ast) {
+  var vars = {};
   var whitelistContinuation = true;  // the top level continuation in a model function has an _address in it, so we don't count it as a lower-level cont
   traverse(
     ast,
@@ -216,14 +244,50 @@ var getTopLevelVars = function(ast) {
           return;
         }
 
+        // ignore thunks introduced by trampolining
+        // if (node.params.length == 0) {
+        //   return
+        // }
+
         var variableNames = _.pluck(node.params, 'name');
 
         if (_.find(variableNames, function(name) { return /_address/.test(name) })) {
           this.skip();
         } else {
-          var addedNames = _.reject(variableNames,
-                                    function(name) { return /globalStore/.test(name) || /_k/.test(name) || /_result/.test(name) })
-          vars = vars.concat(addedNames);
+          var isBookKeepingName = function(name) { return /globalStore/.test(name) || /_k/.test(name) };
+
+          // i believe that addedNames is either length 0 or length 1
+          var addedNames = _.reject(variableNames, isBookKeepingName);
+
+          if (addedNames.length > 1) {
+            console.log('weird case: more than 1 added name: ', addedNames.join(', '))
+          }
+
+          if (addedNames.length == 0) {
+            // return
+          }
+
+          console.log(gen(node))
+
+          console.log('adding ', addedNames.join(', '))
+
+
+
+          // get dependencies of this variable
+          // assumption: parent is a CallExpression
+          var dependencies = _.chain(parent.arguments)
+              .filter(function(x) { return x.type == 'Identifier' })
+              .pluck('name')
+              .reject(isBookKeepingName)
+              .value();
+
+          console.log('-> dependencies are ', dependencies.join(', '))
+          console.log('')
+
+          _.each(addedNames,
+                 function(name) {
+                   vars[name] = dependencies
+                 })
         }
       }
     }
@@ -232,12 +296,11 @@ var getTopLevelVars = function(ast) {
   return vars;
 }
 
-console.log(getTopLevelVars(ast2));
-process.exit()
-
+// console.log(getTopLevelVars(ast2));
+// process.exit()
 
 // returns all identifiers referenced in a syntax subtree
-var treeIdentifiers = function(t, name) {
+var getIdentifiers = function(t, name) {
 
   var names = [];
 
@@ -255,9 +318,25 @@ var treeIdentifiers = function(t, name) {
 }
 
 var topLevelDependencies = function(ast) {
-  var varNames = getTopLevelVars(ast);
 
-  var modelBody = ast.body[0].expression.body.body;
+  // walk AST until we hit a FunctionExpression, then extract top level vars
+  // (we need to do this walking because the ast we receive might correspond to "var f = function() { }")
+  // or, in the future, maybe just "function() {}" if the model passed to inference was anonymous
+  // (though i'll need to stash info about the model with the posterior distribution in webppl)
+  var fnAst;
+
+  traverse(ast,
+           {enter: function(node, parent) {
+             if (node.type == 'FunctionExpression') {
+               fnAst = node;
+               this.break();
+             }
+           }}
+          );
+
+  var varNames = getTopLevelVars(fnAst);
+
+  var modelBody = fnAst.body.body;
 
   return _.chain(varNames)
     .map(function(varName) {
@@ -268,15 +347,13 @@ var topLevelDependencies = function(ast) {
                                    ast1.declarations[0].id.name == varName
                                });
 
-      var otherIdentifiers = _.without(treeIdentifiers(declaration), varName);
+      var otherIdentifiers = _.without(getIdentifiers(declaration), varName);
       return [varName, _.intersection(varNames, otherIdentifiers)];
 
     })
     .object()
     .value();
 }
-
-
 
 var bayesBall = function(dependencies, query, givens) {
   var getParents = function(node) {
@@ -345,4 +422,64 @@ var bayesBall = function(dependencies, query, givens) {
 
   return visited;
 
+}
+
+var getWpplSource = function(f) {
+  //return uniqueNames(esprima.parse(f.toString()))
+
+  // get the original source of f
+
+
+
+  var smc = new SourceMapConsumer(global.__sourceMap__);
+  var mappings = [];
+  smc.eachMapping(function(m) {
+    mappings.push(m)
+  })
+
+  var fName = f.name;
+  var fString = f.toString();
+
+  // get line, col position that f appears in in generated code
+  var fPosition = global.__compiled__.indexOf(fString);
+  var fSplit = global.__compiled__.slice(0, fPosition).split('\n');
+  var fLine = fSplit.length;
+
+  var mapping = _.findWhere(mappings, {source: 'webppl:program', generatedLine: fLine});
+  // get original position
+  var originalLine = mapping.originalLine,
+      originalColumn = mapping.originalColumn;
+
+  var wpplCode = _.last(global.__sourceMap__.sourcesContent);
+
+  var wpplAst = esprima.parse(wpplCode, {loc: true});
+
+  var originalCode;
+
+  traverse(wpplAst,
+           {enter: function(node, parent) {
+             // look for var <name> = function(...) { ... }
+             if (node.type == 'VariableDeclarator' && node.id.name == fName && node.init.type == 'FunctionExpression') {
+               //candidateModelCode.push(gen(node))
+               if (node.loc.start.line == originalLine && node.loc.start.column == originalColumn) {
+                 originalCode = gen(node);
+                 this.break();
+               }
+             }
+           }})
+
+  // TODO: there can be multiple locations mapping these attributes; ensure that i've picked the right one
+
+  return ('(' + originalCode + ')');
+
+}
+
+var structure = function(f) {
+  var wpplSource = getWpplSource(f);
+  var ast = esprima.parse(wpplSource);
+  return topLevelDependencies(ast);
+}
+
+module.exports = {
+  structure: structure
 }
