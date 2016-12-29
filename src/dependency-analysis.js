@@ -2,17 +2,23 @@
   (local-set-key (kbd "s-r") (lambda () (interactive) (save-buffer) (process-send-string "*shell viz*" "echo '\n'; node src/dependency-analysis.js\n")))
 */
 
+var _ = require('underscore');
+
 var esprima = require('esprima');
+
 var escodegen = require('escodegen'),
     gen = escodegen.generate;
+
 var escope = require('escope');
 
-var traverse = require('estraverse').traverse;
-var replace = require('estraverse').replace;
-var _ = require('underscore');
+var estraverse = require('estraverse'),
+    traverse = estraverse.traverse,
+    replace = estraverse.replace;
+
 var lodash = require('lodash');
-var Closure = require('./closure');
-var SourceMapConsumer = require('source-map').SourceMapConsumer;
+var Closure = require('./closure'); // TODO: decruft
+var reflection = require('./reflection'),
+    getWpplSource = reflection.getWpplSource;
 
 /*
   (function() {,
@@ -424,62 +430,30 @@ var bayesBall = function(dependencies, query, givens) {
 
 }
 
-var getWpplSource = function(f) {
-  //return uniqueNames(esprima.parse(f.toString()))
-
-  // get the original source of f
-
-
-
-  var smc = new SourceMapConsumer(global.__sourceMap__);
-  var mappings = [];
-  smc.eachMapping(function(m) {
-    mappings.push(m)
-  })
-
-  var fName = f.name;
-  var fString = f.toString();
-
-  // get line, col position that f appears in in generated code
-  var fPosition = global.__compiled__.indexOf(fString);
-  var fSplit = global.__compiled__.slice(0, fPosition).split('\n');
-  var fLine = fSplit.length;
-
-  var mapping = _.findWhere(mappings, {source: 'webppl:program', generatedLine: fLine});
-  // get original position
-  var originalLine = mapping.originalLine,
-      originalColumn = mapping.originalColumn;
-
-  var wpplCode = _.last(global.__sourceMap__.sourcesContent);
-
-  var wpplAst = esprima.parse(wpplCode, {loc: true});
-
-  var originalCode;
-
-  traverse(wpplAst,
-           {enter: function(node, parent) {
-             // look for var <name> = function(...) { ... }
-             if (node.type == 'VariableDeclarator' && node.id.name == fName && node.init.type == 'FunctionExpression') {
-               //candidateModelCode.push(gen(node))
-               if (node.loc.start.line == originalLine && node.loc.start.column == originalColumn) {
-                 originalCode = gen(node);
-                 this.break();
-               }
-             }
-           }})
-
-  // TODO: there can be multiple locations mapping these attributes; ensure that i've picked the right one
-
-  return ('(' + originalCode + ')');
-
-}
 
 var structure = function(f) {
   var wpplSource = getWpplSource(f);
   var ast = esprima.parse(wpplSource);
   return topLevelDependencies(ast);
+  // TODO: make sigma.js spec and render it
 }
 
+var cliques = function(f, observedVars, queryVars) {
+  var wpplSource = getWpplSource(f);
+  var ast = esprima.parse(wpplSource);
+  var dependencies = topLevelDependencies(ast);
+
+  // // TODO: get conditions from source code
+  // var observedVars = [];
+
+  // // TODO: get query vars from source code
+  // var queryVars = ['z'];
+
+  return bayesBall(dependencies, queryVars[0], observedVars);
+}
+
+
 module.exports = {
-  structure: structure
+  structure: structure,
+  cliques: cliques
 }
