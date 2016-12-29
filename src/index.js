@@ -1690,6 +1690,9 @@ _.each(vizExtensions,
          viz[k] = v
        })
 
+viz.cliques = dependencyAnalysis.cliques;
+
+viz.getSupport = require('./support-analysis').getSupport;
 
 if (typeof module !== 'undefined' && module.exports) {
   exports = module.exports = viz;
