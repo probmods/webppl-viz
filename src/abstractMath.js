@@ -1,51 +1,10 @@
 var _ = require('underscore');
 var lodash = require('lodash');
 
-// int.upper can be equal to int.lower
-// in which case we just have a number
-function Interval(opts) {
-  this.lower = opts.lower;
-  this.upper = opts.upper;
-}
+var Interval = require('interval-arithmetic');
 
-function between(x, lower, upper) {
-  return x >= lower && x <= upper
-}
-
-Interval.prototype.overlaps = function(that) {
-  return false ||
-    //
-    //     ...---]
-    //     [----------]
-    //
-    between(this.upper, that.lower, that.upper) ||
-    between(that.upper, this.lower, this.upper) ||
-    //
-    //          [---...
-    //     [----------]
-    //
-    between(this.lower, that.lower, that.upper) ||
-    between(that.lower, this.lower, this.upper);
-}
-
-Interval.prototype.merge = function(that) {
-  return new Interval({
-    lower: Math.min(this.lower, that.lower),
-    upper: Math.max(this.upper, that.upper)
-  })
-}
-
-function interval(lower, upper) {
-  var int = new Interval({lower: lower, upper: upper});
-  return int;
-}
-
-Interval.prototype.isFinite = function() {
-  return this.lower == this.upper
-}
 
 // a support is an array of intervals
-// trick for subclassing Array from https://jokeyrhyme.github.io/blog/2013/05/13/1/js_inheritance_and_array_prototype.html
 
 function Support(intervals) {
   this.intervals = intervals
@@ -63,26 +22,35 @@ Support.prototype.length = function() {
   return this.intervals.length;
 }
 
-// merge overlapping intervals
+// merge overlapping intervals within a support
 Support.prototype.normalize = function() {
-  var newIntervals = [];
+  var runningIntervals = [];
   this.intervals.forEach(function(curInt) {
-    // see if we can merge with any previously seen intervals
-    var previousMergeIndex = _.findIndex(newIntervals,
-                                         function(prevInt) {
-                                           return prevInt.overlaps(curInt)
-                                         }
-                                        )
+
+    var overlapsCurrent = function(prevInt) {
+      return Interval.intervalsOverlap(prevInt, curInt);
+    }
+
+    // partition previously touched intervals by whether they overlap
+    // the current one or not
+    var partitioned = _.groupBy(runningIntervals, overlapsCurrent),
+        dontMerge = partitioned['false'] || [],
+        doMerge = partitioned['true'] || [];
+
+    var merged = _.reduce(doMerge, Interval.union, curInt);
+
+    runningIntervals = dontMerge.concat(merged);
   })
+  return runningIntervals
 }
 
 function support() {
   var args = _.toArray(arguments);
   var intervals = args.map(function(x) {
     if (_.isArray(x)) {
-      return interval(x[0], x[1])
+      return Interval(x[0], x[1])
     } else if (_.isNumber(x)) {
-      return interval(x, x)
+      return Interval(x)
     } else {
       throw new Error('unhandled interval argument : ' + x)
     }
@@ -104,23 +72,37 @@ function productMap(S, T, f) {
 }
 
 function add(S, T) {
-  return productMap(S, T,
-                    function(s, t) {
-                      return new Interval({
-                        lower: s.lower + t.lower,
-                        upper: s.upper + t.upper
-                      })
-  })
+  var U = new Support(productMap(S, T, Interval.add));
+  return U.normalize();
+}
+
+function sub(S, T) {
+  var U = new Support(productMap(S, T, Interval.sub));
+  return U.normalize();
+}
+
+function mul(S, T) {
+  var U = new Support(productMap(S, T, Interval.mul));
+  return U.normalize();
+}
+
+function div(S, T) {
+  var U = new Support(productMap(S, T, Interval.div));
+  return U.normalize();
 }
 
 
-// add(support(interval(3,5)))
+var x = support([1,2],[3,4]);
+var y = support(1, 2);
 
-// var x = support([3, 5], [6, 7])
-// var y = support(1, 2)
+console.log(add(x,y))
+console.log(sub(x,y))
+console.log(mul(x,y))
+console.log(div(x,y))
 
-// console.log(add(x, y))
-
-var a = interval(3, 4);
-var b = interval(1, 5);
-console.log(a.overlaps(b))
+module.exports = {
+  add: add,
+  sub: sub,
+  mul: mul,
+  div: div
+}
