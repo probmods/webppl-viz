@@ -62,6 +62,17 @@
     scratch pad:
       <pre id="testing"><code></code></pre>
 
+      <h3>static analysis</h3>
+      dependency structure:
+      <pre><code>var f = function() {
+  var x = flip(0.5); // [x],
+  var y = repeat(2, function() { x ? gaussian(0,1) : beta(2,2) }); // [x,y], // TODO: second arg should be a function, not a value
+  var z = map(function (x) { var z = x + 1; return z }, y); // [x,y,x],
+  return z
+};
+
+viz.model(f)</code></pre>
+
       <h3>functionality</h3>
     primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
