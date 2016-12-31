@@ -73,6 +73,18 @@
 
 viz.model(f)</code></pre>
 
+      <h3>depAuto: visualize independent cliques</h3>
+      <pre><code>var model = function() {
+  var x = flip(0.5);
+  var y = beta(4,4);
+  var z = gaussian(0,1);
+  var w = uniform(-z, z);
+
+  return {x: x, y: y, z: z, w: w}}
+
+viz.depAuto(Infer({method: 'rejection', samples: 1000}, model))</code></pre>
+      (thought -- if there are independent cliques, does this mean we can decompose inference into inference on the independent submodels?)
+
       <h3>functionality</h3>
     primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
