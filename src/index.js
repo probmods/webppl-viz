@@ -2,6 +2,7 @@ var _ = require('underscore');
 var d3 = require('d3');
 var $ = require('jquery');
 var dependencyAnalysis = require('./dependency-analysis');
+var reflection = require('./reflection');
 
 global.d3 = d3;
 
@@ -620,7 +621,8 @@ function parallelCoordinates(args, options) {
 
 // automatically render an ERP
 function auto(obj, _options) {
-  var options = _.defaults(_options || {}, {});
+  var options = _.defaults(_options || {},
+                           {display: 'block'});
   var getColumnType = function(columnValues) {
     // for now, support real, integer, and categorical
     // some questions:
@@ -880,7 +882,8 @@ function renderSpec(spec, _options) {
                             fileName: false,
                             smartNumbers: true,
                             smartTickLabels: true,
-                            callback: function() { }
+                            callback: function() { },
+                            css: {}
                            })
 
   // OPTIMIZE: don't mutate spec (but probably don't just want to clone either, since
@@ -988,7 +991,7 @@ function renderSpec(spec, _options) {
       // TODO: if running in browser but editor isn't present, append graphic to body
     } else {
 
-      var resultContainer = wpEditor.makeResultContainer()
+      var resultContainer = wpEditor.makeResultContainer({css: options.css})
 
       var r = React.createElement(GraphComponent,
                                   _.extend({spec: vgSpec},
@@ -1640,7 +1643,7 @@ function marginals(erp, options) {
         print(field + ":");
       }
 
-      viz.auto(fauxErp, options)
+      viz.auto(fauxErp, _.extend({css: {display: 'inline-block'}}, options))
     }
   )
 }
@@ -1664,6 +1667,42 @@ var viz = function(s,k,a) {
   return auto.apply(null, args);
 }
 
+function depAuto(dist) {
+  // TODO: assert that wpplFn exists and is a function
+
+
+  var cliques = dependencyAnalysis.cliques(dist.wpplFn,
+                                           // TODO: remove this mock values once i've finished detecting them inside cliques()
+                                           [],
+                                           ['x','y','z','w']);
+
+  // run viz.auto on each subdistribution
+  _.each(cliques,
+         function(clique) {
+           // TODO: optimize. do 1 pass through distribution rather than #cliques passes
+           var getCliqueComponents = _.partial(_.pick, _, clique);
+           var distGrouped = _.groupBy(dist.support(),
+                                       function(state) {
+                                         return JSON.stringify(_.pick(state, clique))
+                                       });
+           var subdistSupport = _.keys(distGrouped).map(JSON.parse);
+           var subdistProbs = _.map(distGrouped,
+                                    function(states) {
+                                      return Math.exp(util.logsumexp(states.map(function(state) { return dist.score(state) } )))
+                                    })
+
+           var subdist = new dists.Categorical({vs: subdistSupport,
+                                                ps: subdistProbs});
+
+           viz.auto(subdist, {css: {display: 'inline-block'}})
+
+         })
+
+
+  return cliques
+
+}
+
 function vizModel(f) {
   return dependencyAnalysis.structure(f);
 }
@@ -1682,7 +1721,8 @@ var vizExtensions = {
   renderSpec: renderSpec,
   stats: stats,
   coarsen: coarsen,
-  model: vizModel
+  model: vizModel,
+  depAuto: depAuto
 }
 
 _.each(vizExtensions,
@@ -1690,9 +1730,8 @@ _.each(vizExtensions,
          viz[k] = v
        })
 
-viz.cliques = dependencyAnalysis.cliques;
-
 viz.getSupport = require('./support-analysis').getSupport;
+
 
 if (typeof module !== 'undefined' && module.exports) {
   exports = module.exports = viz;

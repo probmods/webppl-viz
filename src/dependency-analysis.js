@@ -801,6 +801,7 @@ function dependenciesToSigmaSpec(deps) {
   return spec;
 }
 
+// TODO: render to svg
 var structure = function(f) {
   var wpplSource = reflection.getWpplSource(f);
   var ast = esprima.parse(wpplSource);
@@ -877,28 +878,55 @@ var structure = function(f) {
 
   var s = new sigma(sigmaSpec);
   s.startNoverlap({nodeMargin: 5});
-
-  //s.refresh();
-
-
-
-
-  // TODO: make sigma.js spec and render it
 }
 
-var cliques = function(f, observedVars, queryVars) {
+var cliques = function(f, MOCK_observedVars, MOCK_queryVars) {
   var wpplSource = reflection.getWpplSource(f);
   var ast = esprima.parse(wpplSource);
   ast = reflection.uniqueNames(ast);
   var dependencies = topLevelDependencies(ast);
 
   // // TODO: get conditions from source code
-  // var observedVars = [];
+  var observedVars = MOCK_observedVars;
 
   // // TODO: get query vars from source code
-  // var queryVars = ['z'];
+  var queryVars = MOCK_queryVars;
 
-  return bayesBall(dependencies, queryVars[0], observedVars);
+  var dependencySets = _.map(
+    queryVars,
+    function(queryVar) {
+      return _.keys(bayesBall(dependencies, queryVar, observedVars));
+    }
+  )
+
+  // merge dependency sets that overlap
+  var runningDependencySets = [];
+  _.each(dependencySets,
+         function(curSet) {
+           // console.log('curSet: ' + curSet);
+
+           var overlapsCurrent = function(prevSet) {
+             return _.intersection(curSet, prevSet).length > 0;
+           }
+
+           // partition previously touched depsets by whether they overlap
+           // the current one or not
+           var partitioned = _.groupBy(runningDependencySets, overlapsCurrent),
+               dontMerge = partitioned['false'] || [],
+               doMerge = partitioned['true'] || [];
+
+           // console.log('dontMerge:', dontMerge);
+           // console.log('doMerge:', doMerge);
+
+           var merged = _.unique(_.flatten(doMerge).concat(curSet));
+           // console.log('merged:', merged);
+
+           runningDependencySets = dontMerge.concat([merged]);
+           // console.log('running:', JSON.stringify(runningDependencySets));
+           // console.log('\n')
+         })
+
+  return runningDependencySets;
 }
 
 
