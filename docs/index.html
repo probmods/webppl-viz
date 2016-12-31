@@ -62,29 +62,6 @@
     scratch pad:
       <pre id="testing"><code></code></pre>
 
-      <h3>static analysis</h3>
-      dependency structure:
-      <pre><code>var f = function() {
-  var x = flip(0.5); // [x],
-  var y = repeat(2, function() { x ? gaussian(0,1) : beta(2,2) }); // [x,y], // TODO: second arg should be a function, not a value
-  var z = map(function (x) { var z = x + 1; return z }, y); // [x,y,x],
-  return z
-};
-
-viz.model(f)</code></pre>
-
-      <h3>depAuto: visualize independent cliques</h3>
-      <pre><code>var model = function() {
-  var x = flip(0.5);
-  var y = beta(4,4);
-  var z = gaussian(0,1);
-  var w = uniform(-z, z);
-
-  return {x: x, y: y, z: z, w: w}}
-
-viz.depAuto(Infer({method: 'rejection', samples: 1000}, model))</code></pre>
-      (thought -- if there are independent cliques, does this mean we can decompose inference into inference on the independent submodels?)
-
       <h3>functionality</h3>
     primitives:
     <pre><code>viz.bar(['a','b','c'], [1,2,3])
@@ -279,6 +256,29 @@ viz(Poisson({mu: 5}))</code></pre>
 
     </div>
     <div class="col">
+
+      <h3>static analysis</h3>
+      dependency structure:
+      <pre><code>var f = function() {
+  var x = flip(0.5); // [x],
+  var y = repeat(2, function() { x ? gaussian(0,1) : beta(2,2) }); // [x,y], // TODO: second arg should be a function, not a value
+  var z = map(function (x) { var z = x + 1; return z }, y); // [x,y,x],
+  return z
+};
+
+viz.model(f)</code></pre>
+
+      depAuto: visualize independent cliques
+      <pre><code>var model = function() {
+  var x = flip(0.5);
+  var y = beta(4,4);
+  var z = gaussian(0,1);
+  var w = uniform(-z, z);
+
+  return {x: x, y: y, z: z, w: w}}
+
+viz.depAuto(Infer({method: 'rejection', samples: 1000}, model))</code></pre>
+      (thought -- if there are independent cliques, does this mean we can decompose inference into subproblems over independent submodels?)
 
       <h3>user friendliness</h3>
       tick label rotation:
