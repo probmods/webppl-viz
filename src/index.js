@@ -1611,7 +1611,6 @@ function table(obj, options) {
   }
 }
 
-// TODO: display in a wrapped row
 // TODO: optimize
 // TODO: build as single vega spec with group marks
 function marginals(erp, options) {
@@ -1636,11 +1635,6 @@ function marginals(erp, options) {
           var scores = _.pluck(rows, '__score__');
           return util.logsumexp(scores);
         }
-      }
-
-      // only call print if running in browser
-      if (runningInBrowser()) {
-        print(field + ":");
       }
 
       viz.auto(fauxErp, _.extend({css: {display: 'inline-block'}}, options))
