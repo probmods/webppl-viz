@@ -196,7 +196,7 @@ kindPrinter.r = function(args, options) {
 
   var probs = _.pluck(data, 'prob');
 
-  var densityEstimates = kde(values, {weights: probs});
+  var densityEstimates = kde(values, _.extend(options, {weights: probs}));
 
   var vlSpec = {
     "data": {"values": densityEstimates},
@@ -873,7 +873,7 @@ var GraphComponent = React.createClass({
       React.createElement('div', { className: 'clearboth' })
     );
   }
-})
+});
 
 // parse a vega-lite or regular vega description and render it
 function renderSpec(spec, _options) {
