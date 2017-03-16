@@ -19,7 +19,7 @@ var stats = require('./stats'),
     kde2d = stats.kde2d;
 
 function runningInBrowser() {
-  return (typeof window === 'object')
+  return (typeof window === 'object' && typeof navigator === 'object')
 }
 
 function isDist(x) {
@@ -387,7 +387,11 @@ kindPrinter.ccc = function(args, options) {
   _.each(bucketedData,
          function(d,field3Value) {
            // TODO: make this less hacky
-           global.print({},function() {},'',field3Name + ' = ' + field3Value);
+           // global.print prints the value of the categorical variable
+           // should render the text inside the plot instead
+           if (runningInBrowser()) {
+            global.print({},function() {},'',field3Name + ' = ' + field3Value);
+           }
            var vlSpec = {
              data: {values: d},
              mark: "text",
