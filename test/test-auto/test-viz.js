@@ -7,8 +7,9 @@ var readline = require('readline');
 var webppl = require('webppl');
 require('../../')
 
-// this function collects and saves all examples in docs/index.html
-// all examples are saved in saveDir in separate files for test use
+// this function collects all examples in docs/index.html
+// all examples are saved in the code array
+// if saveDir is specified, code snippets are also stored as files in saveDir
 function parseHTMLForCode(filename, saveArray, saveDir) {
   var data = fs.readFileSync(filename);
   var content = data.toString().split('\n');
