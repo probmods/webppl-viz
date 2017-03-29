@@ -4,11 +4,12 @@
 
 var fs = require('fs');
 var readline = require('readline');
-var exec = require('child_process').exec;
+var webppl = require('webppl');
+require('../../')
 
 // this function collects and saves all examples in docs/index.html
 // all examples are saved in saveDir in separate files for test use
-function parseHTMLSaveCode(filename, saveDir) {
+function parseHTMLForCode(filename, saveArray, saveDir) {
   var data = fs.readFileSync(filename);
   var content = data.toString().split('\n');
   var length = content.length, i = 0, counter = 1;
@@ -28,10 +29,13 @@ function parseHTMLSaveCode(filename, saveDir) {
         line = content[i];
       }
       code.push(line.substring(0, line.indexOf(code_end)))
-      var logger = fs.createWriteStream(saveDir + counter + '.wppl');
-      for (var j in code) {
-        logger.write(code[j]);
-        logger.write('\n');
+      saveArray.push(code);
+      if (saveDir) {
+        var logger = fs.createWriteStream(saveDir + counter + '.wppl');
+        for (var j in code) {
+          logger.write(code[j]);
+          logger.write('\n');
+        }
       }
       counter++;
     }
@@ -39,78 +43,43 @@ function parseHTMLSaveCode(filename, saveDir) {
   }
 }
 
-// input: an array of paths to all test examples
-// return: an array of commands (strings) to execute on these examples
-function getExecCommands(example_paths) {
-  var execCommands = [];
-  for (var i in example_paths) {
-    var scriptName = example_paths[i];
-    execCommands.push('webppl test_js/' + scriptName + ' --require ../.. --random-seed 1');
+// delete a folder and all its content
+var deleteFolderRecursive = function(path) {
+  if( fs.existsSync(path) ) {
+    fs.readdirSync(path).forEach(function(file,index){
+      var curPath = path + "/" + file;
+      if(fs.lstatSync(curPath).isDirectory()) { // recurse
+        deleteFolderRecursive(curPath);
+      } else { // delete file
+        fs.unlinkSync(curPath);
+      }
+    });
+    fs.rmdirSync(path);
   }
-  return execCommands;
-}
+};
 
-// this function runs an array of commands in order
-function runCommands(array, callback) {
+// run all webppl code snippets in the array sequentially
+function runCode(array, callback) {
   var index = 0;
   var results = [];
-
-  function locations(substring, string){
-    // find all occurrences of a substring in a string
-    // return: an array of indices
-    var a = [], i = -1;
-    while((i = string.indexOf(substring,i + 1)) >= 0) a.push(i);
-    return a;
-  }
 
   function next() {
     // Run next command in the array
     if (index < array.length) {
-      var cmd = array[index++];
-      exec(cmd, {maxBuffer: 1024 * 8192}, function(err, stdout) {
-        console.log('Executing: ' + cmd);
-        var locs = locations('.svg', stdout);
-        // diff is the last command
-        // do a summary when it is diff
-        if (cmd.indexOf('diff') !== -1) {
-          console.log('#####################################################');
-          if ((!stdout || stdout.length < 1) && (!err || stdout.length < 1)) {
-            console.log('Compared. All generated svgs are correct.');
-          } else {
-            if (!fs.existsSync('correct-svgs')) {
-              console.log('Error: No directory named "correct-svgs"');
-            } else {
-              var errsvgs = {};
-              // load the correct mapping of svg to its code
-              var map = JSON.parse(fs.readFileSync('svgs.json'));
-              for (var j in locs) {
-                var svg = stdout.substring(locs[j] - 7, locs[j] + 4);
-                errsvgs[svg] = map[svg];
-              }
-              if (Object.keys(errsvgs).length > 0) {
-                console.log('These tests did not pass because of incorrect svgs:');
-                console.log(errsvgs);
-              }
-            }
-          }
+      var code = array[index];
+      index++;
+      codeStr = code.join('\n');
+      try {
+        if (index in blackList) {
+          next();
         } else {
-          if (err) console.log(err.message);
-          for (var j in locs) {
-            var svg = stdout.substring(locs[j] - 7, locs[j] + 4);
-            console.log('  ' + svg + ' generated');
-            if (updateSvgMap) {
-              // add entries to the svgMap object
-              // key: svg name; value: the webppl script generating the svg
-              var args = cmd.split(' ');
-              var scriptName = args[1];
-              svgMap[svg] = scriptName.split('/')[1];
-            }
-          }
+          console.log('Executing: #' + index + ' - ' + testNum2testName[index]);
+          webppl.run('util.seedRNG(1);' + codeStr, next);
         }
-        // run the next command
-        results.push(stdout);
+      } catch(err) {
+        console.log('*******FAILED*******');
         next();
-      });
+      }
     } else {
       // all done
       callback(null, results);
@@ -120,6 +89,79 @@ function runCommands(array, callback) {
   next();
 }
 
+// return true if the file is svg file
+function isSvg(filename) {
+  return filename.indexOf('.svg') >= 0
+}
+
+// move svgs to the ./results dir and diff directories
+function compareSvgs() {
+  var currentFiles = fs.readdirSync('.');
+  for (var i = 0; i < currentFiles.length; i++) {
+    var filename = currentFiles[i];
+    if (isSvg(filename)) {
+      fs.renameSync(filename, 'results/' + filename);
+    }
+  }
+  diff('./results', './correct-svgs');
+}
+
+// compare two files
+// return true if two files are exactly the same
+function areSameFiles(filename1, filename2) {
+  var file1 = fs.readFileSync(filename1);
+  var file2 = fs.readFileSync(filename2);
+  return file1.toString() === file2.toString();
+}
+
+// diff two directories
+function diff(results, correct) {
+  var svgs = fs.readdirSync(results).sort().filter(isSvg);
+  var correctSvgs = fs.readdirSync(correct).sort().filter(isSvg);
+  var i = 0, j = 0;
+  var unexpectedOnes = [];
+  var missingOnes = [];
+  var errOnes = [];
+  while (i < svgs.length && j < correctSvgs.length) {
+    if (svgs[i] < correctSvgs[j]) {
+      unexpectedOnes.push(svgs[i]);
+      i++;
+    } else if (svgs[i] > correctSvgs[j]) {
+      missingOnes.push(correctSvgs[j]);
+      j++;
+    } else {
+      if (!areSameFiles(results + '/' + svgs[i], correct + '/' + correctSvgs[j])) {
+        errOnes.push(svgs[i]);
+      }
+      i++;
+      j++;
+    }
+  }
+  if (unexpectedOnes.length > 0) {
+    console.log('These svgs are unexpected: ' + unexpectedOnes);
+  }
+  if (missingOnes.length > 0) {
+    console.log('These svgs are missing: ' + missingOnes);
+  }
+  if (errOnes.length > 0) {
+    console.log('These svgs are incorrect: ' + errOnes);
+  }
+  var failedTests = {}
+  for (var i in missingOnes) {
+    failedTests[testNum2testName[svg2testNum[missingOnes[i]]]] = 1;
+  }
+  for (var j in errOnes) {
+    failedTests[testNum2testName[svg2testNum[errOnes[j]]]] = 1;
+  }
+  failedNames = Object.keys(failedTests);
+  if (failedNames.length === 0) {
+    console.log('All ' + Object.keys(testNum2testName).length + ' tests passed!');
+  } else {
+    console.log('Tests failed: ');
+    console.log(failedNames);
+  }
+}
+
 
 // only set updateSvgMap to true when the results of the current
 // execution are going to be set as correct answers
@@ -127,26 +169,31 @@ var updateSvgMap = false;
 // key: svg name; value: the webppl script generating the svg
 var svgMap = {};
 // check test dir exists or not, parse index.html if not
-if (!fs.existsSync('test_js')) {
-  fs.mkdirSync('test_js');
-  parseHTMLSaveCode('../../docs/index.html', 'test_js/');
-}
-var scripts = fs.readdirSync('test_js/');
-// get the array of webppl command to execute on examples
-var commands = getExecCommands(scripts);
+var codeArray = [];
+parseHTMLForCode('../../docs/index.html', codeArray);
+
+// key: svg name
+// value: the id of the test it belongs to
+var svg2testNum = JSON.parse(fs.readFileSync('svgs.json'));
+
+// key: the id of a test
+// value: the name of a test
+var testNum2testName = JSON.parse(fs.readFileSync('test-names.json'));
+
+// create a new results dir
+// the old one is removed first
 if (!fs.existsSync('results')) {
-  // make a dir for results if there aren't
-  commands.push('mkdir results');
+  fs.mkdirSync('results');
+} else {
+  deleteFolderRecursive('results');
+  fs.mkdirSync('results');
 }
-// move svgs to the results dir
-// check results by diff
-commands.push('mv *.svg results', 'diff -bur results correct-svgs');
-runCommands(commands, function (err, results) {
-  // do somethings here when all commands are completed
-  if (updateSvgMap) {
-    console.log('new svg map saved to json file');
-    json = JSON.stringify(svgMap);
-    fs.writeFileSync('svgs.json', json);
-  }
-  console.log('#####################################################');
+
+// the keys of blackList are the numbers of code snippets that
+// we don't want to run below
+var blackList = {19: 1, 20: 1, 21: 1, 22: 1};
+
+// run code snippets and compare with correct svgs
+runCode(codeArray, function (err, results) {
+  setTimeout(compareSvgs, 3000);
 });
