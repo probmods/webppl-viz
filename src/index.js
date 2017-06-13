@@ -19,7 +19,7 @@ var stats = require('./stats'),
     kde2d = stats.kde2d;
 
 function runningInBrowser() {
-  return (typeof window === 'object' && typeof navigator === 'object')
+  return (typeof window === 'object' && typeof navigator === 'object');
 }
 
 function isDist(x) {
