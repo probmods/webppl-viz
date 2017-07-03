@@ -310,7 +310,8 @@ kindPrinter.cr = function(args, options) {
                                        var groupWeight = util.sum(_.pluck(states,'prob'));
 
                                        var rValues = _.pluck(states, rDimName);
-                                       var estimates = kde(rValues);
+                                       var probs = _.pluck(states, 'prob');
+                                       var estimates = kde(rValues, {weights: probs});
                                        _.each(estimates, function(est) { est.density *= groupWeight });
                                        return estimates;
                                      });
@@ -439,7 +440,8 @@ kindPrinter.ccr = function(args, options) {
                                        var groupWeight = util.sum(_.pluck(states,'prob'));
 
                                        var rValues = _.pluck(states, rDimName);
-                                       var estimates = kde(rValues);
+                                       var probs = _.pluck(states, 'prob');
+                                       var estimates = kde(rValues, {weights: probs});
                                        _.each(estimates, function(est) { est.density *= groupWeight });
                                        return estimates;
                                      });
