@@ -3,6 +3,7 @@ var d3 = require('d3');
 var $ = require('jquery');
 var dependencyAnalysis = require('./dependency-analysis');
 var reflection = require('./reflection');
+var open = require("open");
 
 global.d3 = d3;
 
@@ -1039,6 +1040,11 @@ function renderSpec(spec, _options) {
 
                     require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
+                    
+                    if(process.env.WEBPPL_VIZ_AUTOOPEN) {
+                        open(fileName);
+                    }
+                    
                     util.trampolineRunners.cli()( options.callback() )
                   });
 

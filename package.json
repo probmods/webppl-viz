@@ -49,7 +49,8 @@
     "source-map": "^0.5.6",
     "underscore": "^1.8.3",
     "vega": "^2.6.3",
-    "vega-lite": "^1.2.0"
+    "vega-lite": "^1.2.0",
+    "open": "0.0.5"
   },
   "devDependencies": {
     "aws-sdk": "^2.4.2",
@@ -65,7 +66,6 @@
     "grunt-gjslint": "^0.2.1",
     "grunt-subgrunt": "^1.2.0",
     "jstransform": "^11.0.3",
-    "open": "0.0.5",
     "through": "^2.3.8",
     "watchify": "^3.7.0",
     "webppl": "probmods/webppl#8941a5",
