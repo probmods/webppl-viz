@@ -1036,12 +1036,23 @@ function renderSpec(spec, _options) {
                   function(error, chart) {
                     var view = chart({renderer: 'svg'}).update();
                     var svgText = view.svg();
-                    var fileName = options.fileName || (md5(svgText).substring(0,7) + '.svg');
+                    
+                    var now = new Date();
+                    var str = now.getUTCFullYear().toString() + "_" +
+                            (now.getUTCMonth() + 1).toString() + "_" +
+                            now.getUTCDate() + "_" +
+                            now.getUTCHours() + "_" +
+                            now.getUTCMinutes() + "_" +
+                            now.getUTCSeconds() + "_" +
+                            now.getMiliseconds;
+                            
+                    var fileName = options.fileName || str + '.svg');
 
                     require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
                     
                     if(process.env.WEBPPL_VIZ_AUTOOPEN) {
+                        
                         open(fileName);
                     }
                     
