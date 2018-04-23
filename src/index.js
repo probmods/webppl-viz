@@ -1043,10 +1043,13 @@ function renderSpec(spec, _options) {
                             now.getUTCDate() + "_" +
                             now.getUTCHours() + "_" +
                             now.getUTCMinutes() + "_" +
-                            now.getUTCSeconds() + "_" +
-                            now.getMilliseconds();
+                            now.getUTCSeconds();
                             
-                    var fileName = options.fileName || str + '.svg');
+                    var fileName = options.fileName || str + '.svg';
+                    
+                    if (fs.existsSync(fileName)) {
+                        fileName += "_" + now.getMilliseconds();
+                    }
 
                     require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
