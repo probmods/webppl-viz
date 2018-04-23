@@ -3,6 +3,7 @@ var d3 = require('d3');
 var $ = require('jquery');
 var dependencyAnalysis = require('./dependency-analysis');
 var reflection = require('./reflection');
+var open = require("open");
 
 global.d3 = d3;
 
@@ -1035,10 +1036,29 @@ function renderSpec(spec, _options) {
                   function(error, chart) {
                     var view = chart({renderer: 'svg'}).update();
                     var svgText = view.svg();
-                    var fileName = options.fileName || (md5(svgText).substring(0,7) + '.svg');
+                    
+                    var now = new Date();
+                    var str = now.getUTCFullYear().toString() + "_" +
+                            (now.getUTCMonth() + 1).toString() + "_" +
+                            now.getUTCDate() + "_" +
+                            now.getUTCHours() + "_" +
+                            now.getUTCMinutes() + "_" +
+                            now.getUTCSeconds();
+                            
+                    var fileName = options.fileName || str + '.svg';
+                    
+                    if (fs.existsSync(fileName)) {
+                        fileName += "_" + now.getMilliseconds();
+                    }
 
                     require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
+                    
+                    if(process.env.WEBPPL_VIZ_AUTOOPEN) {
+                        
+                        open(fileName);
+                    }
+                    
                     util.trampolineRunners.cli()( options.callback() )
                   });
 
