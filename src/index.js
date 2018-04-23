@@ -1044,7 +1044,7 @@ function renderSpec(spec, _options) {
                             now.getUTCHours() + "_" +
                             now.getUTCMinutes() + "_" +
                             now.getUTCSeconds() + "_" +
-                            now.getMiliseconds;
+                            now.getMilliseconds();
                             
                     var fileName = options.fileName || str + '.svg');
 
