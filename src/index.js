@@ -4,7 +4,6 @@ var $ = require('jquery');
 var dependencyAnalysis = require('./dependency-analysis');
 var reflection = require('./reflection');
 var open = require("open");
-var fs = require('fs');
 global.d3 = d3;
 
 var vl = require('vega-lite');
@@ -1047,11 +1046,12 @@ function renderSpec(spec, _options) {
                             
                     var fileName = options.fileName || str + '.svg';
                     
-                    if (fs.existsSync(fileName)) {
-                        fileName += "_" + now.getMilliseconds();
+                    if (require('fs').existsSync(fileName)) {
+                        fileName = fileName.replace('.svg','');
+                        fileName += "_" + now.getMilliseconds() + '.svg';
                     }
 
-                    fs.writeFileSync(fileName, svgText);
+                    require('fs').writeFileSync(fileName, svgText);
                     console.log("Rendered to " + fileName);
                     
                     if(process.env.WEBPPL_VIZ_AUTOOPEN) {
