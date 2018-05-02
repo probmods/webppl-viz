@@ -13,6 +13,7 @@ Installation:
 ```sh
 cd ~                             # or however you get to the home directory
 mkdir .webppl                    # make a folder called .webppl (if it doesn't already exist)
+cd .webppl
 npm install probmods/webppl-viz  # install this node package
 ```
 
